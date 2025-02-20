@@ -21,3 +21,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# filepath: /Users/kunselchodak/Developer/TANC_ID/tanc_id/.gitignore
+.env
