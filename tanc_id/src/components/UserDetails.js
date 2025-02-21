@@ -14,7 +14,6 @@ function UserDetails({ user, onClose }) {
       <p>Home Address: {user.homeAddress}</p>
       <img src={user.photoUrl} alt="User" width="200" />
       <p>Want ID: {user.wantId ? "Yes" : "No"}</p>
-      <button onClick={onClose}>Close</button>
     </div>
   );
 }

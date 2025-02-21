@@ -127,6 +127,40 @@ function AdminPanel() {
     setSelectedApplication(null); // Remove details view after approve/deny
   };
 
+  const handleRemoveUser = async (user) => {
+    try {
+      // Delete user from authentication
+      const userAuth = await auth.getUser(user.id);
+      if (userAuth) {
+        await deleteUser(userAuth);
+      }
+
+      // Remove user from users collection
+      await deleteDoc(doc(db, "users", user.id));
+
+      // Remove images from Cloudinary
+      if (user.photoUrl) {
+        await fetch(
+          `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/destroy`,
+          {
+            method: "POST",
+            body: JSON.stringify({ public_id: user.photoUrl }),
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      // Update state
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setSelectedUser(null); // Remove details view after removal
+    } catch (err) {
+      console.error(err);
+      alert("Error removing user: " + err.message);
+    }
+  };
+
   const handleSelectApplication = (application) => {
     setSelectedApplication(application);
   };
@@ -175,10 +209,15 @@ function AdminPanel() {
                 {user.firstName} {user.lastName}
               </button>
               {selectedUser && selectedUser.id === user.id && (
-                <UserDetails
-                  user={selectedUser}
-                  onClose={() => setSelectedUser(null)}
-                />
+                <>
+                  <UserDetails
+                    user={selectedUser}
+                    onClose={() => setSelectedUser(null)}
+                  />
+                  <button onClick={() => handleRemoveUser(selectedUser)}>
+                    Remove User
+                  </button>
+                </>
               )}
             </li>
           ))}
@@ -186,9 +225,15 @@ function AdminPanel() {
       </div>
       <div>
         <h3>Admins</h3>
+        <p>
+          Note: You can search Firebase Authentication for a specific UID to
+          find the associated email.
+        </p>
         <ul>
           {filteredAdmins.map((admin) => (
-            <li key={admin.id}>{admin.email}</li>
+            <li key={admin.id}>
+              {admin.emailAddress} (UID: {admin.id})
+            </li>
           ))}
         </ul>
       </div>
@@ -199,7 +244,7 @@ function AdminPanel() {
             .filter((app) => !app.approved)
             .map((app) => (
               <li key={app.id}>
-                {app.firstName} {app.lastName} - {app.email}
+                {app.firstName} {app.lastName} - {app.emailAddress}
                 <button onClick={() => handleSelectApplication(app)}>
                   View Details
                 </button>

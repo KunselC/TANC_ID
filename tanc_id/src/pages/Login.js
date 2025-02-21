@@ -3,8 +3,9 @@ import {
   signInWithEmailAndPassword,
   sendSignInLinkToEmail,
 } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
 import { useNavigate, Link } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -23,11 +24,25 @@ function Login() {
         window.localStorage.setItem("emailForSignIn", email);
         alert("Check your email for the sign-in link.");
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        navigate("/my-id");
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+        const user = userCredential.user;
+
+        // Check if the user is an admin
+        const adminDoc = await getDoc(doc(db, "admins", user.uid));
+        if (adminDoc.exists()) {
+          await auth.signOut();
+          alert("Please log in as a user to view your ID.");
+        } else {
+          navigate("/my-id");
+        }
       }
     } catch (err) {
       console.error(err);
+      alert("Error logging in: " + err.message);
     }
   };
 

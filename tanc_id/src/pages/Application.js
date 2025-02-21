@@ -59,7 +59,7 @@ function Application() {
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
         memberSince: formData.memberSince,
-        emailAddress: formData.emailAddress,
+        emailAddress: formData.email,
         homeAddress: formData.homeAddress,
         greenBookUrl: greenBookUrl,
         headShotUrl: headShotUrl,
@@ -181,6 +181,7 @@ function Application() {
             setFormData({ ...formData, headShot: e.target.files[0] })
           }
         />
+        <p>Please upload only PNG or JPG image files.</p>
       </div>
       <div>
         <label>Do you want an ID?</label>
