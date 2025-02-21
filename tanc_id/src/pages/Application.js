@@ -15,11 +15,10 @@ function Application() {
     emailAddress: "",
     homeAddress: "",
     greenBook: null,
-    headShot: null,
+    headShot: null, // Use a more specific name for the photo field
     wantId: false,
     email: "",
     password: "",
-    photo: null,
   });
 
   const [status, setStatus] = useState("");
@@ -27,13 +26,22 @@ function Application() {
   const handleSubmit = async () => {
     setStatus("Submitting...");
     try {
+      // Upload green book photo to Cloudinary
+      let greenBookUrl = "";
       if (formData.greenBook) {
         const greenBookRes = await uploadToCloudinary(formData.greenBook);
-        console.log("Green Book URL:", greenBookRes.secure_url);
+        greenBookUrl = greenBookRes.secure_url;
+        console.log("Green Book URL:", greenBookUrl);
       }
+
+      // Upload headshot photo to Cloudinary
+      let headShotUrl = "";
       if (formData.headShot) {
         const headShotRes = await uploadToCloudinary(formData.headShot);
-        console.log("Head Shot URL:", headShotRes.secure_url);
+        headShotUrl = headShotRes.secure_url;
+        console.log("Head Shot URL:", headShotUrl);
+      }
+
       // Create user account
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -42,19 +50,21 @@ function Application() {
       );
       const user = userCredential.user;
 
-      // Upload photo to Cloudinary
-      let photoUrl = "";
-      if (formData.photo) {
-        const photoRes = await uploadToCloudinary(formData.photo);
-        photoUrl = photoRes.secure_url;
-      }
-
       // Save application data to Firestore
       await addDoc(collection(db, "applications"), {
         userId: user.uid,
-        name: formData.name,
+        firstName: formData.firstName,
+        middleName: formData.middleName,
+        lastName: formData.lastName,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        memberSince: formData.memberSince,
+        emailAddress: formData.emailAddress,
+        homeAddress: formData.homeAddress,
+        greenBookUrl: greenBookUrl,
+        headShotUrl: headShotUrl,
+        wantId: formData.wantId,
         email: formData.email,
-        photoUrl: photoUrl,
         approved: false,
       });
 
@@ -72,21 +82,27 @@ function Application() {
         <label>First Name</label>
         <input
           value={formData.firstName}
-          onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, firstName: e.target.value })
+          }
         />
       </div>
       <div>
         <label>Middle Name</label>
         <input
           value={formData.middleName}
-          onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, middleName: e.target.value })
+          }
         />
       </div>
       <div>
         <label>Last Name</label>
         <input
           value={formData.lastName}
-          onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, lastName: e.target.value })
+          }
         />
       </div>
       <div>
@@ -94,7 +110,9 @@ function Application() {
         <input
           type="date"
           value={formData.dateOfBirth}
-          onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, dateOfBirth: e.target.value })
+          }
         />
       </div>
       <div>
@@ -114,22 +132,26 @@ function Application() {
         <input
           type="date"
           value={formData.memberSince}
-          onChange={(e) => setFormData({ ...formData, memberSince: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, memberSince: e.target.value })
+          }
         />
       </div>
       <div>
         <label>Email Address</label>
         <input
           type="email"
-          value={formData.emailAddress}
-          onChange={(e) => setFormData({ ...formData, emailAddress: e.target.value })}
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
         />
       </div>
       <div>
         <label>Home Address</label>
         <input
           value={formData.homeAddress}
-          onChange={(e) => setFormData({ ...formData, homeAddress: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, homeAddress: e.target.value })
+          }
         />
       </div>
       <div>
@@ -138,6 +160,8 @@ function Application() {
           type="file"
           onChange={(e) =>
             setFormData({ ...formData, greenBook: e.target.files[0] })
+          }
+        />
       </div>
       <div>
         <label>Password</label>
@@ -145,13 +169,12 @@ function Application() {
           type="password"
           value={formData.password}
           onChange={(e) =>
-            setFormData({ ...formData, password: e.target.value }
+            setFormData({ ...formData, password: e.target.value })
           }
         />
       </div>
       <div>
         <label>Head Shot Photo</label>
-        <label>Photo</label>
         <input
           type="file"
           onChange={(e) =>
@@ -164,14 +187,19 @@ function Application() {
         <input
           type="checkbox"
           checked={formData.wantId}
-          onChange={(e) => setFormData({ ...formData, wantId: e.target.checked })}
+          onChange={(e) =>
+            setFormData({ ...formData, wantId: e.target.checked })
+          }
         />
       </div>
       <button onClick={handleSubmit}>Submit</button>
       {status && <p>{status}</p>}
+      <p>
+        The membership fee is $100 for five years, and an additional of $5 is
+        charged for a physical ID Card.
+      </p>
     </div>
   );
 }
 
 export default Application;
-

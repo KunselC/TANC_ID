@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { db } from "../firebase";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { db, auth } from "../firebase";
+import {
+  collection,
+  getDocs,
+  doc,
+  deleteDoc,
+  setDoc,
+} from "firebase/firestore";
+import { deleteUser } from "firebase/auth";
+import UserDetails from "../components/UserDetails";
 
 function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [admins, setAdmins] = useState([]);
   const [applications, setApplications] = useState([]);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -42,41 +51,109 @@ function AdminPanel() {
     fetchApplications();
   }, []);
 
-  const handleApprove = async (id) => {
-    const applicationRef = doc(db, "applications", id);
-    await updateDoc(applicationRef, { approved: true });
-    setApplications((prev) =>
-      prev.map((app) => (app.id === id ? { ...app, approved: true } : app))
-    );
+  const handleApprove = async (application) => {
+    const applicationRef = doc(db, "applications", application.id);
+    const userRef = doc(db, "users", application.userId);
+
+    // Move application to users collection
+    await setDoc(userRef, {
+      firstName: application.firstName,
+      middleName: application.middleName,
+      lastName: application.lastName,
+      dateOfBirth: application.dateOfBirth,
+      gender: application.gender,
+      memberSince: application.memberSince,
+      emailAddress: application.emailAddress,
+      homeAddress: application.homeAddress,
+      photoUrl: application.headShotUrl,
+      wantId: application.wantId,
+    });
+
+    // Remove application from applications collection
+    await deleteDoc(applicationRef);
+
+    // Update state
+    setApplications((prev) => prev.filter((app) => app.id !== application.id));
+    setUsers((prev) => [
+      ...prev,
+      {
+        id: application.userId,
+        firstName: application.firstName,
+        middleName: application.middleName,
+        lastName: application.lastName,
+        dateOfBirth: application.dateOfBirth,
+        gender: application.gender,
+        memberSince: application.memberSince,
+        emailAddress: application.emailAddress,
+        homeAddress: application.homeAddress,
+        photoUrl: application.headShotUrl,
+        wantId: application.wantId,
+      },
+    ]);
+    setSelectedApplication(null); // Remove details view after approve/deny
   };
 
-  const handleDeny = async (id) => {
-    const applicationRef = doc(db, "applications", id);
-    await updateDoc(applicationRef, { approved: false });
-    setApplications((prev) =>
-      prev.map((app) => (app.id === id ? { ...app, approved: false } : app))
-    );
+  const handleDeny = async (application) => {
+    const applicationRef = doc(db, "applications", application.id);
+    const userRef = doc(db, "users", application.userId);
+
+    // Delete user from authentication
+    const user = auth.currentUser;
+    if (user) {
+      await deleteUser(user);
+    }
+
+    // Remove application from applications collection
+    await deleteDoc(applicationRef);
+
+    // Remove user from users collection
+    await deleteDoc(userRef);
+
+    // Remove images from Cloudinary
+    if (application.headShotUrl) {
+      await fetch(
+        `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/image/destroy`,
+        {
+          method: "POST",
+          body: JSON.stringify({ public_id: application.headShotUrl }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    setApplications((prev) => prev.filter((app) => app.id !== application.id));
+    setSelectedApplication(null); // Remove details view after approve/deny
   };
 
   const handleSelectApplication = (application) => {
     setSelectedApplication(application);
   };
 
+  const handleSelectUser = (user) => {
+    if (selectedUser && selectedUser.id === user.id) {
+      setSelectedUser(null); // Toggle off if the same user is clicked again
+    } else {
+      setSelectedUser(user);
+    }
+  };
+
   const filteredUsers = users.filter((user) =>
-    user.email
-      ? user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    user.emailAddress
+      ? user.emailAddress.toLowerCase().includes(searchTerm.toLowerCase())
       : false
   );
 
   const filteredAdmins = admins.filter((admin) =>
-    admin.email
-      ? admin.email.toLowerCase().includes(searchTerm.toLowerCase())
+    admin.emailAddress
+      ? admin.emailAddress.toLowerCase().includes(searchTerm.toLowerCase())
       : false
   );
 
   const filteredApplications = applications.filter((app) =>
-    app.email
-      ? app.email.toLowerCase().includes(searchTerm.toLowerCase())
+    app.emailAddress
+      ? app.emailAddress.toLowerCase().includes(searchTerm.toLowerCase())
       : false
   );
 
@@ -93,7 +170,17 @@ function AdminPanel() {
         <h3>Users</h3>
         <ul>
           {filteredUsers.map((user) => (
-            <li key={user.id}>{user.email}</li>
+            <li key={user.id}>
+              <button onClick={() => handleSelectUser(user)}>
+                {user.firstName} {user.lastName}
+              </button>
+              {selectedUser && selectedUser.id === user.id && (
+                <UserDetails
+                  user={selectedUser}
+                  onClose={() => setSelectedUser(null)}
+                />
+              )}
+            </li>
           ))}
         </ul>
       </div>
@@ -112,12 +199,16 @@ function AdminPanel() {
             .filter((app) => !app.approved)
             .map((app) => (
               <li key={app.id}>
-                {app.name} - {app.email}
+                {app.firstName} {app.lastName} - {app.email}
                 <button onClick={() => handleSelectApplication(app)}>
                   View Details
                 </button>
-                <button onClick={() => handleApprove(app.id)}>Approve</button>
-                <button onClick={() => handleDeny(app.id)}>Deny</button>
+                {!selectedApplication && (
+                  <>
+                    <button onClick={() => handleApprove(app)}>Approve</button>
+                    <button onClick={() => handleDeny(app)}>Deny</button>
+                  </>
+                )}
               </li>
             ))}
         </ul>
@@ -125,10 +216,18 @@ function AdminPanel() {
       {selectedApplication && (
         <div>
           <h3>Application Details</h3>
-          <p>Name: {selectedApplication.name}</p>
-          <p>Email: {selectedApplication.email}</p>
-          <img src={selectedApplication.photoUrl} alt="User" width="200" />
-          <button onClick={() => handleApprove(selectedApplication.id)}>
+          <p>First Name: {selectedApplication.firstName}</p>
+          <p>Middle Name: {selectedApplication.middleName}</p>
+          <p>Last Name: {selectedApplication.lastName}</p>
+          <p>Date of Birth: {selectedApplication.dateOfBirth}</p>
+          <p>Gender: {selectedApplication.gender}</p>
+          <p>Member Since: {selectedApplication.memberSince}</p>
+          <p>Email Address: {selectedApplication.emailAddress}</p>
+          <p>Home Address: {selectedApplication.homeAddress}</p>
+          <img src={selectedApplication.greenBookUrl} alt="User" width="200" />
+          <p>Want ID: {selectedApplication.wantId ? "Yes" : "No"}</p>
+          <img src={selectedApplication.headShotUrl} alt="User" width="200" />
+          <button onClick={() => handleApprove(selectedApplication)}>
             Approve
           </button>
           <button onClick={() => handleDeny(selectedApplication.id)}>
