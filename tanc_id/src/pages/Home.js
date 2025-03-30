@@ -10,6 +10,10 @@ function Home() {
       <Link to="/login">User Login</Link>
       <br />
       <Link to="/admin-login">Admin Login</Link>
+      <br />
+      <Link to="/admin-panel">Admin Panel</Link>
+      <br />
+      <Link to="/my-id">My ID</Link>
     </div>
   );
 }

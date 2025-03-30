@@ -15,7 +15,6 @@ import Application from "./pages/Application";
 import AdminLogin from "./pages/AdminLogin";
 import AdminPanel from "./pages/AdminPanel";
 import IDView from "./pages/IDView";
-import TestBackend from "./pages/TestBackend"; // Import TestBackend component
 
 function App() {
   const [user, setUser] = useState(null);
@@ -50,11 +49,6 @@ function App() {
           element={isAdmin ? <AdminPanel /> : <Navigate to="/admin-login" />}
         />
         <Route path="/my-id" element={<IDView />} />
-        <Route
-          path="/test-backend"
-          element={<TestBackend user={user} />}
-        />{" "}
-        {/* Pass user to TestBackend */}
       </Routes>
     </Router>
   );
