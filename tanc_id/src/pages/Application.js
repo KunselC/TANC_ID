@@ -34,6 +34,7 @@ function Application() {
       if (formData.headShot) {
         const headShotRes = await uploadToCloudinary(formData.headShot);
         console.log("Head Shot URL:", headShotRes.secure_url);
+      }
       // Create user account
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -138,6 +139,8 @@ function Application() {
           type="file"
           onChange={(e) =>
             setFormData({ ...formData, greenBook: e.target.files[0] })
+	  }
+	/>
       </div>
       <div>
         <label>Password</label>
@@ -145,7 +148,7 @@ function Application() {
           type="password"
           value={formData.password}
           onChange={(e) =>
-            setFormData({ ...formData, password: e.target.value }
+            setFormData({ ...formData, password: e.target.value })
           }
         />
       </div>
