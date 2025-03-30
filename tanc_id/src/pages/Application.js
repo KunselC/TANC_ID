@@ -38,6 +38,7 @@ function Application() {
       let headShotUrl = "";
       if (formData.headShot) {
         const headShotRes = await uploadToCloudinary(formData.headShot);
+
         headShotUrl = headShotRes.secure_url;
         console.log("Head Shot URL:", headShotUrl);
       }
