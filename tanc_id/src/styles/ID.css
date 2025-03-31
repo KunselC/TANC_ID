@@ -1,0 +1,177 @@
+.id-container {
+  max-width: 800px;
+  margin: 40px auto;
+}
+
+.id-card {
+  background: linear-gradient(135deg, #8b0000, #600000);
+  color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  margin-bottom: 30px;
+}
+
+.id-header {
+  padding: 20px;
+  background-color: rgba(0, 0, 0, 0.2);
+  text-align: center;
+  border-bottom: 4px solid var(--accent-color);
+}
+
+.id-logo {
+  height: 60px;
+  margin-bottom: 10px;
+}
+
+.id-title {
+  font-size: 1.5rem;
+  margin: 0;
+  color: white;
+}
+
+.id-subtitle {
+  font-size: 1rem;
+  opacity: 0.8;
+  margin: 5px 0 0 0;
+}
+
+.id-body {
+  display: flex;
+  padding: 20px;
+}
+
+.id-photo {
+  width: 150px;
+  height: 200px;
+  border: 4px solid var(--accent-color);
+  margin-right: 20px;
+  background-color: white;
+  overflow: hidden;
+}
+
+.id-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.id-details {
+  flex: 1;
+}
+
+.id-name {
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.id-info {
+  margin-bottom: 10px;
+}
+
+.id-label {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  display: block;
+}
+
+.id-value {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.id-footer {
+  padding: 15px 20px;
+  background-color: rgba(0, 0, 0, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.id-expiry {
+  font-weight: 600;
+}
+
+.id-notice {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+.id-instructions {
+  background-color: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  margin-bottom: 30px;
+}
+
+.id-instructions h3 {
+  color: var(--primary-color);
+  margin-bottom: 15px;
+}
+
+.physical-id-notice {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: rgba(212, 175, 55, 0.1);
+  border-left: 4px solid var(--accent-color);
+  border-radius: 4px;
+}
+
+.print-button {
+  background-color: var(--secondary-color);
+  margin-top: 20px;
+  padding: 10px 20px;
+}
+
+.status-container {
+  background-color: white;
+  padding: 30px;
+  text-align: center;
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+}
+
+.status-message {
+  margin: 20px 0;
+  font-size: 1.1rem;
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  .id-body {
+    flex-direction: column;
+  }
+
+  .id-photo {
+    width: 120px;
+    height: 160px;
+    margin: 0 auto 20px;
+  }
+
+  .id-footer {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+}
+
+@media print {
+  .navbar,
+  .footer,
+  .id-instructions,
+  button {
+    display: none;
+  }
+
+  .id-container {
+    margin: 0;
+    padding: 0;
+  }
+
+  .id-card {
+    page-break-inside: avoid;
+  }
+}

@@ -3,8 +3,11 @@ import { uploadToCloudinary } from "../cloudinary";
 import { auth, db } from "../firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { collection, addDoc } from "firebase/firestore";
+import { useNavigate, Link } from "react-router-dom";
+import "../styles/Form.css";
 
 function Application() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     middleName: "",
@@ -12,26 +15,58 @@ function Application() {
     dateOfBirth: "",
     gender: "",
     memberSince: "",
-    emailAddress: "",
     homeAddress: "",
     greenBook: null,
-    headShot: null, // Use a more specific name for the photo field
+    headShot: null,
     wantId: false,
     email: "",
     password: "",
   });
 
   const [status, setStatus] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [statusType, setStatusType] = useState(""); // success or error
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.firstName) newErrors.firstName = "First name is required";
+    if (!formData.lastName) newErrors.lastName = "Last name is required";
+    if (!formData.dateOfBirth)
+      newErrors.dateOfBirth = "Date of birth is required";
+    if (!formData.gender) newErrors.gender = "Gender is required";
+    if (!formData.memberSince)
+      newErrors.memberSince = "Member since date is required";
+    if (!formData.homeAddress)
+      newErrors.homeAddress = "Home address is required";
+    if (!formData.email) newErrors.email = "Email is required";
+    if (!formData.password) newErrors.password = "Password is required";
+    if (formData.password && formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    }
+    if (!formData.headShot) newErrors.headShot = "Head shot photo is required";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async () => {
-    setStatus("Submitting...");
+    if (!validateForm()) {
+      setStatus("Please correct the errors in the form.");
+      setStatusType("error");
+      return;
+    }
+
+    setIsLoading(true);
+    setStatus("Submitting application...");
+    setStatusType("info");
+
     try {
       // Upload green book photo to Cloudinary
       let greenBookUrl = "";
       if (formData.greenBook) {
         const greenBookRes = await uploadToCloudinary(formData.greenBook);
         greenBookUrl = greenBookRes.secure_url;
-        console.log("Green Book URL:", greenBookUrl);
       }
 
       // Upload headshot photo to Cloudinary
@@ -39,7 +74,6 @@ function Application() {
       if (formData.headShot) {
         const headShotRes = await uploadToCloudinary(formData.headShot);
         headShotUrl = headShotRes.secure_url;
-        console.log("Head Shot URL:", headShotUrl);
       }
 
       // Create user account
@@ -64,141 +98,239 @@ function Application() {
         greenBookUrl: greenBookUrl,
         headShotUrl: headShotUrl,
         wantId: formData.wantId,
-        email: formData.email,
         approved: false,
+        createdAt: new Date().toISOString(),
       });
 
-      setStatus("Application submitted!");
+      setStatus(
+        "Application submitted successfully! Redirecting to homepage..."
+      );
+      setStatusType("success");
+      setTimeout(() => {
+        navigate("/");
+      }, 3000);
     } catch (err) {
       console.error(err);
-      setStatus("Error submitting application.");
+      setStatus("Error submitting application: " + err.message);
+      setStatusType("error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2>Application</h2>
-      <div>
-        <label>First Name</label>
-        <input
-          value={formData.firstName}
-          onChange={(e) =>
-            setFormData({ ...formData, firstName: e.target.value })
-          }
-        />
+    <div className="form-container">
+      <h2 className="form-title">Membership Application</h2>
+
+      {status && (
+        <div
+          className={`form-status ${
+            statusType === "success"
+              ? "form-status-success"
+              : statusType === "error"
+              ? "form-status-error"
+              : ""
+          }`}
+        >
+          {status}
+        </div>
+      )}
+
+      <div className="form-row">
+        <div className="form-column">
+          <div className="form-group">
+            <label className="form-label required">First Name</label>
+            <input
+              className={`form-input ${errors.firstName ? "error" : ""}`}
+              value={formData.firstName}
+              onChange={(e) =>
+                setFormData({ ...formData, firstName: e.target.value })
+              }
+            />
+            {errors.firstName && (
+              <p className="form-error">{errors.firstName}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="form-column">
+          <div className="form-group">
+            <label className="form-label required">Last Name</label>
+            <input
+              className={`form-input ${errors.lastName ? "error" : ""}`}
+              value={formData.lastName}
+              onChange={(e) =>
+                setFormData({ ...formData, lastName: e.target.value })
+              }
+            />
+            {errors.lastName && <p className="form-error">{errors.lastName}</p>}
+          </div>
+        </div>
       </div>
-      <div>
-        <label>Middle Name</label>
+
+      <div className="form-group">
+        <label className="form-label">Middle Name</label>
         <input
+          className="form-input"
           value={formData.middleName}
           onChange={(e) =>
             setFormData({ ...formData, middleName: e.target.value })
           }
         />
       </div>
-      <div>
-        <label>Last Name</label>
-        <input
-          value={formData.lastName}
-          onChange={(e) =>
-            setFormData({ ...formData, lastName: e.target.value })
-          }
-        />
+
+      <div className="form-row">
+        <div className="form-column">
+          <div className="form-group">
+            <label className="form-label required">Date of Birth</label>
+            <input
+              className={`form-input ${errors.dateOfBirth ? "error" : ""}`}
+              type="date"
+              value={formData.dateOfBirth}
+              onChange={(e) =>
+                setFormData({ ...formData, dateOfBirth: e.target.value })
+              }
+            />
+            {errors.dateOfBirth && (
+              <p className="form-error">{errors.dateOfBirth}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="form-column">
+          <div className="form-group">
+            <label className="form-label required">Gender</label>
+            <select
+              className={`form-select ${errors.gender ? "error" : ""}`}
+              value={formData.gender}
+              onChange={(e) =>
+                setFormData({ ...formData, gender: e.target.value })
+              }
+            >
+              <option value="">Select...</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+            {errors.gender && <p className="form-error">{errors.gender}</p>}
+          </div>
+        </div>
       </div>
-      <div>
-        <label>Date of Birth</label>
+
+      <div className="form-group">
+        <label className="form-label required">Member Since</label>
         <input
-          type="date"
-          value={formData.dateOfBirth}
-          onChange={(e) =>
-            setFormData({ ...formData, dateOfBirth: e.target.value })
-          }
-        />
-      </div>
-      <div>
-        <label>Gender</label>
-        <select
-          value={formData.gender}
-          onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-        >
-          <option value="">Select...</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-      <div>
-        <label>Member Since</label>
-        <input
+          className={`form-input ${errors.memberSince ? "error" : ""}`}
           type="date"
           value={formData.memberSince}
           onChange={(e) =>
             setFormData({ ...formData, memberSince: e.target.value })
           }
         />
+        {errors.memberSince && (
+          <p className="form-error">{errors.memberSince}</p>
+        )}
       </div>
-      <div>
-        <label>Email Address</label>
+
+      <div className="form-group">
+        <label className="form-label required">Email Address</label>
         <input
+          className={`form-input ${errors.email ? "error" : ""}`}
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
         />
+        {errors.email && <p className="form-error">{errors.email}</p>}
       </div>
-      <div>
-        <label>Home Address</label>
+
+      <div className="form-group">
+        <label className="form-label required">Home Address</label>
         <input
+          className={`form-input ${errors.homeAddress ? "error" : ""}`}
           value={formData.homeAddress}
           onChange={(e) =>
             setFormData({ ...formData, homeAddress: e.target.value })
           }
         />
+        {errors.homeAddress && (
+          <p className="form-error">{errors.homeAddress}</p>
+        )}
       </div>
-      <div>
-        <label>Green Book Photo</label>
+
+      <div className="form-group">
+        <label className="form-label required">Password</label>
         <input
-          type="file"
-          onChange={(e) =>
-            setFormData({ ...formData, greenBook: e.target.files[0] })
-          }
-        />
-      </div>
-      <div>
-        <label>Password</label>
-        <input
+          className={`form-input ${errors.password ? "error" : ""}`}
           type="password"
           value={formData.password}
           onChange={(e) =>
             setFormData({ ...formData, password: e.target.value })
           }
         />
+        <p className="form-hint">Must be at least 6 characters</p>
+        {errors.password && <p className="form-error">{errors.password}</p>}
       </div>
-      <div>
-        <label>Head Shot Photo</label>
+
+      <div className="form-group">
+        <label className="form-label">Green Book Photo</label>
         <input
+          className="form-file-input"
           type="file"
+          accept="image/png, image/jpeg"
+          onChange={(e) =>
+            setFormData({ ...formData, greenBook: e.target.files[0] })
+          }
+        />
+        <p className="form-hint">Please upload only PNG or JPG image files.</p>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label required">Head Shot Photo</label>
+        <input
+          className="form-file-input"
+          type="file"
+          accept="image/png, image/jpeg"
           onChange={(e) =>
             setFormData({ ...formData, headShot: e.target.files[0] })
           }
         />
-        <p>Please upload only PNG or JPG image files.</p>
+        <p className="form-hint">Please upload only PNG or JPG image files.</p>
+        {errors.headShot && <p className="form-error">{errors.headShot}</p>}
       </div>
-      <div>
-        <label>Do you want an ID?</label>
-        <input
-          type="checkbox"
-          checked={formData.wantId}
-          onChange={(e) =>
-            setFormData({ ...formData, wantId: e.target.checked })
-          }
-        />
+
+      <div className="form-group">
+        <div className="form-checkbox-group">
+          <input
+            type="checkbox"
+            id="want-id"
+            className="form-checkbox"
+            checked={formData.wantId}
+            onChange={(e) =>
+              setFormData({ ...formData, wantId: e.target.checked })
+            }
+          />
+          <label htmlFor="want-id">
+            I want a physical ID card ($5 additional fee)
+          </label>
+        </div>
       </div>
-      <button onClick={handleSubmit}>Submit</button>
-      {status && <p>{status}</p>}
-      <p>
-        The membership fee is $100 for five years, and an additional of $5 is
-        charged for a physical ID Card.
-      </p>
+
+      <div className="form-info">
+        <p>
+          The membership fee is $100 for five years, and an additional $5 is
+          charged for a physical ID Card.
+        </p>
+      </div>
+
+      <div className="form-actions">
+        <button
+          onClick={handleSubmit}
+          disabled={isLoading}
+          className="form-submit"
+        >
+          {isLoading ? "Submitting..." : "Submit Application"}
+        </button>
+      </div>
     </div>
   );
 }
