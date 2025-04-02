@@ -9,6 +9,8 @@
   --success-color: #34c759;
   --border-radius: 4px;
   --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --font-heading: "Cinzel", serif;
+  --font-body: "Nunito Sans", sans-serif;
 }
 
 * {
@@ -19,9 +21,7 @@
 
 body {
   margin: 0;
-  font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
-    "Helvetica Neue", sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--light-bg);
@@ -40,8 +40,10 @@ h3,
 h4,
 h5,
 h6 {
+  font-family: var(--font-heading);
   color: var(--primary-color);
   margin-bottom: 1rem;
+  font-weight: 600;
 }
 
 h1 {
@@ -79,6 +81,7 @@ button {
   cursor: pointer;
   font-weight: 500;
   transition: background-color 0.2s;
+  font-family: var(--font-body);
 }
 
 button:hover {

@@ -14,6 +14,76 @@
   color: var(--primary-color);
 }
 
+.form-progress {
+  display: flex;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.form-progress::before {
+  content: "";
+  position: absolute;
+  top: 25px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ddd;
+  z-index: 0;
+}
+
+.progress-step {
+  flex: 1;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.step-number {
+  width: 50px;
+  height: 50px;
+  line-height: 50px;
+  border-radius: 50%;
+  background: #f8f8f8;
+  border: 2px solid #ddd;
+  color: #999;
+  margin: 0 auto 10px;
+  font-weight: bold;
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s;
+}
+
+.step-label {
+  color: #999;
+  font-size: 0.9rem;
+  transition: all 0.3s;
+}
+
+.progress-step.active .step-number {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.progress-step.active .step-label {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.progress-step.completed .step-number {
+  background: var(--success-color);
+  border-color: var(--success-color);
+  color: white;
+}
+
+.progress-step.completed .step-label {
+  color: var(--success-color);
+}
+
+.progress-step.completed {
+  cursor: pointer;
+}
+
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -91,6 +161,31 @@
   gap: 1rem;
 }
 
+.form-navigation {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.form-button {
+  background-color: var(--secondary-color);
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.form-prev {
+  background-color: #666;
+}
+
+.form-next {
+  background-color: var(--secondary-color);
+}
+
 .form-submit {
   background-color: var(--primary-color);
   color: white;
@@ -127,6 +222,18 @@
   border-radius: var(--border-radius);
 }
 
+.form-status-success {
+  background-color: rgba(52, 199, 89, 0.1);
+  border: 1px solid var(--success-color);
+  color: var(--success-color);
+}
+
+.form-status-error {
+  background-color: rgba(255, 59, 48, 0.1);
+  border: 1px solid var(--error-color);
+  color: var(--error-color);
+}
+
 .form-info {
   margin-top: 2rem;
   padding: 15px;
@@ -143,5 +250,46 @@
 
   .form-column {
     flex: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-progress {
+    flex-direction: column;
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+
+  .form-progress::before {
+    width: 2px;
+    height: auto;
+    top: 0;
+    bottom: 0;
+    left: 24px;
+    right: auto;
+  }
+
+  .progress-step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  .step-number {
+    margin: 0 15px 0 0;
+  }
+
+  .step-label {
+    text-align: left;
+  }
+
+  .form-navigation {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .form-button,
+  .form-submit {
+    width: 100%;
   }
 }

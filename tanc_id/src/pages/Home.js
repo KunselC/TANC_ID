@@ -1,21 +1,25 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { IdCardIcon, ApplicationIcon, SecurityIcon } from "../components/Icons";
 import "../styles/Home.css";
+import tancLogo from "../assets/images/tanc-logo.jpg";
+import SystemStatus from "../components/SystemStatus";
 
 function Home() {
   return (
     <div className="home-container">
       <section className="hero">
+        <img src={tancLogo} alt="TANC Logo" className="hero-logo" />
         <h1>Tibetan Association of Northern California</h1>
         <p>
           Our digital ID system makes it easy to maintain your membership and
           access community services.
         </p>
         <div className="cta-buttons">
-          <Link to="/application" className="navbar-button primary-cta">
+          <Link to="/application" className="cta-button primary-cta">
             Apply for ID
           </Link>
-          <Link to="/login" className="navbar-button secondary-cta">
+          <Link to="/login" className="cta-button secondary-cta">
             Member Login
           </Link>
         </div>
@@ -23,13 +27,17 @@ function Home() {
 
       <section className="features">
         <div className="feature-card">
-          <div className="feature-icon">🆔</div>
+          <div className="feature-icon">
+            <IdCardIcon />
+          </div>
           <h3 className="feature-title">Digital ID</h3>
           <p>Access your digital membership ID from anywhere, anytime.</p>
         </div>
 
         <div className="feature-card">
-          <div className="feature-icon">✨</div>
+          <div className="feature-icon">
+            <ApplicationIcon />
+          </div>
           <h3 className="feature-title">Easy Application</h3>
           <p>
             Apply for your membership and ID card in just a few simple steps.
@@ -37,7 +45,9 @@ function Home() {
         </div>
 
         <div className="feature-card">
-          <div className="feature-icon">🔒</div>
+          <div className="feature-icon">
+            <SecurityIcon />
+          </div>
           <h3 className="feature-title">Secure System</h3>
           <p>Your information is stored securely and protected.</p>
         </div>
@@ -54,6 +64,8 @@ function Home() {
           cultural events, and educational programs.
         </p>
       </section>
+
+      <SystemStatus />
     </div>
   );
 }

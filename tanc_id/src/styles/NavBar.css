@@ -59,6 +59,23 @@
   width: 100%;
 }
 
+.navbar-link-admin {
+  background-color: rgba(255, 255, 255, 0.15);
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.admin-nav-badge {
+  background-color: var(--accent-color);
+  color: var(--primary-color);
+  font-size: 0.7rem;
+  padding: 2px 5px;
+  border-radius: 8px;
+  margin-left: 5px;
+  vertical-align: text-top;
+  font-weight: 700;
+}
+
 .navbar-button {
   background-color: var(--accent-color);
   color: var(--primary-color);

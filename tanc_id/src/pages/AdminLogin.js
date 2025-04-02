@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebase";
@@ -12,6 +12,26 @@ function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Check if already authenticated as admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const user = auth.currentUser;
+      if (user && localStorage.getItem("isAdmin") === "true") {
+        // Verify admin status from database
+        try {
+          const adminDoc = await getDoc(doc(db, "admins", user.uid));
+          if (adminDoc.exists()) {
+            navigate("/admin-panel");
+          }
+        } catch (err) {
+          console.error("Error verifying admin status:", err);
+        }
+      }
+    };
+
+    checkAdminStatus();
+  }, [navigate]);
+
   const handleAdminLogin = async () => {
     if (!adminUser || !adminPass) {
       setError("Please enter both email and password");
@@ -22,6 +42,8 @@ function AdminLogin() {
     setError("");
 
     try {
+      console.log("Attempting admin login with:", adminUser);
+
       // Sign in the user
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -29,22 +51,48 @@ function AdminLogin() {
         adminPass
       );
       const user = userCredential.user;
+      console.log("User authenticated, checking admin status for:", user.uid);
 
       // Check if the user is an admin
-      const adminDoc = await getDoc(doc(db, "admins", user.uid));
+      const adminDocRef = doc(db, "admins", user.uid);
+      const adminDoc = await getDoc(adminDocRef);
+
+      console.log("Admin document exists:", adminDoc.exists());
+
       if (adminDoc.exists()) {
-        // User is an admin, navigate to admin panel
+        console.log("User confirmed as admin, navigating to panel");
+        // Store admin status in local storage to persist between refreshes
+        localStorage.setItem("isAdmin", "true");
+        // Navigate to admin panel
         navigate("/admin-panel");
       } else {
         // User is not an admin, sign out and show error
+        console.log("User is not an admin, signing out");
         await auth.signOut();
+        localStorage.removeItem("isAdmin");
         setError("You do not have access to the admin panel.");
       }
     } catch (err) {
-      console.error(err);
-      setError("Invalid admin credentials.");
+      console.error("Admin login error:", err);
+      // More descriptive error messages
+      if (err.code === "auth/invalid-credential") {
+        setError("Invalid email or password.");
+      } else if (err.code === "auth/user-not-found") {
+        setError("No admin account exists with this email.");
+      } else if (err.code === "auth/network-request-failed") {
+        setError("Network error. Please check your connection.");
+      } else {
+        setError(`Login error: ${err.message}`);
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Support for Enter key
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      handleAdminLogin();
     }
   };
 
@@ -69,6 +117,7 @@ function AdminLogin() {
             value={adminUser}
             onChange={(e) => setAdminUser(e.target.value)}
             disabled={isLoading}
+            onKeyPress={handleKeyPress}
           />
         </div>
 
@@ -84,6 +133,7 @@ function AdminLogin() {
             value={adminPass}
             onChange={(e) => setAdminPass(e.target.value)}
             disabled={isLoading}
+            onKeyPress={handleKeyPress}
           />
         </div>
 

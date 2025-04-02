@@ -8,7 +8,7 @@
 }
 
 .hero {
-  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
     url("https://upload.wikimedia.org/wikipedia/commons/3/3c/Tibet_-_Potala_Palace.jpg");
   background-size: cover;
   background-position: center;
@@ -18,9 +18,17 @@
   border-radius: 8px;
   margin-bottom: 40px;
   width: 100%;
+  position: relative;
+}
+
+.hero-logo {
+  height: 80px;
+  margin-bottom: 20px;
+  filter: brightness(0) invert(1);
 }
 
 .hero h1 {
+  font-family: var(--font-heading);
   font-size: 2.5rem;
   margin-bottom: 15px;
   color: white;
@@ -30,6 +38,7 @@
   font-size: 1.2rem;
   max-width: 800px;
   margin: 0 auto 30px;
+  font-weight: 300;
 }
 
 .cta-buttons {
@@ -43,11 +52,17 @@
   padding: 12px 24px;
   font-size: 1rem;
   font-weight: 600;
+  border-radius: 4px;
+  transition: all 0.3s ease;
 }
 
 .primary-cta {
   background-color: var(--accent-color);
   color: var(--primary-color);
+}
+
+.primary-cta:hover {
+  background-color: #c19e2f;
 }
 
 .secondary-cta {
@@ -65,6 +80,7 @@
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 30px;
   width: 100%;
+  margin: 2rem 0;
 }
 
 .feature-card {
@@ -81,14 +97,39 @@
 }
 
 .feature-icon {
-  font-size: 2.5rem;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 15px;
   color: var(--primary-color);
-  margin-bottom: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.feature-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .feature-title {
   margin-bottom: 10px;
   font-size: 1.25rem;
+}
+
+.info-section {
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  margin-top: 2rem;
+  width: 100%;
+  box-shadow: var(--box-shadow);
+  border-top: 4px solid var(--accent-color);
+}
+
+.info-section h2 {
+  font-family: var(--font-heading);
+  color: var(--primary-color);
+  margin-bottom: 20px;
 }
 
 @media (max-width: 768px) {
@@ -98,5 +139,9 @@
 
   .hero h1 {
     font-size: 2rem;
+  }
+
+  .hero-logo {
+    height: 60px;
   }
 }

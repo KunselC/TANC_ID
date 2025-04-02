@@ -3,13 +3,19 @@ import { Link, useLocation } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import "../styles/NavBar.css";
+import tancLogo from "../assets/images/tanc-logo.jpg";
 
-function NavBar({ user }) {
+function NavBar({ user, isAdmin }) {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+      localStorage.removeItem("isAdmin"); // Clear admin status on logout
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   const toggleMenu = () => {
@@ -20,11 +26,7 @@ function NavBar({ user }) {
     <nav className="navbar">
       <div className="navbar-container">
         <div className="navbar-brand">
-          <img
-            src="https://tanc.org/wp-content/uploads/2023/09/tanc-logo-1.png"
-            alt="TANC Logo"
-            className="navbar-logo"
-          />
+          <img src={tancLogo} alt="TANC Logo" className="navbar-logo" />
           <span>TANC ID System</span>
         </div>
 
@@ -51,13 +53,32 @@ function NavBar({ user }) {
 
           {user ? (
             <>
+              {!isAdmin && (
+                <Link
+                  to="/my-id"
+                  className="navbar-link"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  My ID
+                </Link>
+              )}
               <Link
-                to="/my-id"
+                to="/profile"
                 className="navbar-link"
                 onClick={() => setMenuOpen(false)}
               >
-                My ID
+                My Profile
+                {isAdmin && <span className="admin-nav-badge">Admin</span>}
               </Link>
+              {isAdmin && (
+                <Link
+                  to="/admin-panel"
+                  className="navbar-link navbar-link-admin"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Admin Panel
+                </Link>
+              )}
               <button
                 onClick={() => {
                   handleLogout();
@@ -69,22 +90,23 @@ function NavBar({ user }) {
               </button>
             </>
           ) : (
-            <Link
-              to="/login"
-              className="navbar-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              User Login
-            </Link>
+            <>
+              <Link
+                to="/login"
+                className="navbar-link"
+                onClick={() => setMenuOpen(false)}
+              >
+                User Login
+              </Link>
+              <Link
+                to="/admin-login"
+                className="navbar-link navbar-link-admin"
+                onClick={() => setMenuOpen(false)}
+              >
+                Admin Login
+              </Link>
+            </>
           )}
-
-          <Link
-            to="/admin-login"
-            className="navbar-link"
-            onClick={() => setMenuOpen(false)}
-          >
-            Admin Login
-          </Link>
         </div>
       </div>
     </nav>

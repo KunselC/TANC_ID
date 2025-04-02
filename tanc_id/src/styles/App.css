@@ -31,19 +31,124 @@
 }
 
 .tibetan-border {
-  border-top: 8px solid transparent;
-  border-image: repeating-linear-gradient(
-      45deg,
-      var(--primary-color),
-      var(--primary-color) 10px,
-      var(--accent-color) 10px,
-      var(--accent-color) 20px
-    )
-    1;
+  height: 8px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--primary-color) 0%,
+    var(--primary-color) 49%,
+    var(--accent-color) 50%,
+    var(--accent-color) 100%
+  );
+  background-size: 20px 100%;
+}
+
+.loading-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.2rem;
+  color: var(--primary-color);
+}
+
+/* Session warning */
+.session-warning {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  z-index: 1000;
+  padding: 15px;
+  display: flex;
+  justify-content: center;
+}
+
+.session-warning-content {
+  max-width: 500px;
+  background-color: var(--primary-color);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.session-warning h3 {
+  color: white;
+  margin-bottom: 10px;
+}
+
+.session-warning p {
+  margin-bottom: 15px;
+}
+
+.session-extend-button {
+  background-color: var(--accent-color);
+  color: var(--primary-color);
+  font-weight: bold;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.session-extend-button:hover {
+  background-color: #c19e2f;
 }
 
 @media (max-width: 768px) {
   .main-content {
     padding: 15px;
   }
+
+  .session-warning-content {
+    margin: 0 15px;
+  }
+}
+
+.system-status {
+  margin-top: 30px;
+  padding: 15px;
+  border-top: 1px solid #ddd;
+  text-align: center;
+}
+
+.system-status button {
+  background-color: #666;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+}
+
+.status-details {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.status-details h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.status-details ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.status-details li {
+  margin-bottom: 8px;
+}
+
+.environment-info {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px dashed #ddd;
+}
+
+.environment-info h5 {
+  margin-top: 0;
+  margin-bottom: 10px;
 }

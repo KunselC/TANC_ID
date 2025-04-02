@@ -2,58 +2,96 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ImageWithFallback from "../components/ImageWithFallback";
 import "../styles/ID.css";
+import tancLogo from "../assets/images/tanc-logo.jpg";
 
 function IDView() {
   const [userData, setUserData] = useState(null);
   const [status, setStatus] = useState("Loading...");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   // Calculate expiry date (5 years from member since date)
   const calculateExpiryDate = (memberSince) => {
     if (!memberSince) return "Unknown";
-    const date = new Date(memberSince);
-    date.setFullYear(date.getFullYear() + 5);
-    return date.toLocaleDateString();
+    try {
+      const date = new Date(memberSince);
+      date.setFullYear(date.getFullYear() + 5);
+      return date.toLocaleDateString();
+    } catch (err) {
+      console.error("Invalid date format:", err);
+      return "Unknown";
+    }
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUserData = async () => {
       try {
         const user = auth.currentUser;
         if (!user) {
-          setStatus("No user is logged in.");
+          if (isMounted) {
+            setStatus("No user is logged in.");
+            setIsLoading(false);
+          }
           return;
         }
 
         // First check if user is an admin
         const adminDoc = await getDoc(doc(db, "admins", user.uid));
         if (adminDoc.exists()) {
-          setStatus("Please log in as a user to view your ID.");
+          if (isMounted) {
+            setStatus("Please log in as a user to view your ID.");
+            setIsLoading(false);
+          }
           return;
         }
 
         // Then check if user exists in users collection
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (!userDoc.exists()) {
-          setStatus("You need to wait for approval before seeing your ID.");
+          if (isMounted) {
+            setStatus("You need to wait for approval before seeing your ID.");
+            setIsLoading(false);
+          }
           return;
         }
 
         // Add the user ID to the data
-        setUserData({
-          ...userDoc.data(),
-          id: user.uid,
-        });
-        setStatus("");
+        if (isMounted) {
+          setUserData({
+            ...userDoc.data(),
+            id: user.uid,
+          });
+          setStatus("");
+          setIsLoading(false);
+        }
       } catch (err) {
         console.error("Error fetching user data:", err);
-        setStatus("Error loading your ID information. Please try again later.");
+        if (isMounted) {
+          setError(err.message);
+          setStatus(
+            "Error loading your ID information. Please try again later."
+          );
+          setIsLoading(false);
+        }
       }
     };
 
     fetchUserData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  if (isLoading) {
+    return <LoadingSpinner message="Loading your ID..." />;
+  }
 
   if (status) {
     return (
@@ -69,17 +107,27 @@ function IDView() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="id-container">
+        <div className="status-container error">
+          <h2>Error</h2>
+          <p className="status-message">
+            An error occurred while loading your ID: {error}
+          </p>
+          <button onClick={() => window.location.reload()}>Try Again</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="id-container">
       <h2>Your TANC Membership ID</h2>
 
       <div className="id-card">
         <div className="id-header">
-          <img
-            src="https://tanc.org/wp-content/uploads/2023/09/tanc-logo-1.png"
-            alt="TANC Logo"
-            className="id-logo"
-          />
+          <img src={tancLogo} alt="TANC Logo" className="id-logo" />
           <h2 className="id-title">
             Tibetan Association of Northern California
           </h2>
@@ -88,7 +136,13 @@ function IDView() {
 
         <div className="id-body">
           <div className="id-photo">
-            {userData.photoUrl && <img src={userData.photoUrl} alt="Member" />}
+            {userData.photoUrl && (
+              <ImageWithFallback
+                src={userData.photoUrl}
+                alt="Member"
+                className="member-photo"
+              />
+            )}
           </div>
 
           <div className="id-details">

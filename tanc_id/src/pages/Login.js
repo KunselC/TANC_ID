@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   signInWithEmailAndPassword,
   sendSignInLinkToEmail,
+  sendPasswordResetEmail,
   signOut,
 } from "firebase/auth";
 import { auth, db } from "../firebase";
@@ -13,8 +14,10 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordless, setIsPasswordless] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
   const handleLogin = async () => {
@@ -39,7 +42,7 @@ function Login() {
         };
         await sendSignInLinkToEmail(auth, email, actionCodeSettings);
         window.localStorage.setItem("emailForSignIn", email);
-        alert("Check your email for the sign-in link.");
+        setMessage("Check your email for the sign-in link.");
       } else {
         const userCredential = await signInWithEmailAndPassword(
           auth,
@@ -81,6 +84,25 @@ function Login() {
     }
   };
 
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError("Please enter your email address");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setMessage("Password reset email sent. Please check your inbox.");
+      setError("");
+    } catch (err) {
+      setError(`Error: ${err.message}`);
+      setMessage("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="login-container">
       <div className="login-header">
@@ -91,6 +113,7 @@ function Login() {
       </div>
 
       {error && <div className="login-error">{error}</div>}
+      {message && <div className="login-message">{message}</div>}
 
       <div className="login-form">
         <div className="login-group">
@@ -107,7 +130,7 @@ function Login() {
           />
         </div>
 
-        {!isPasswordless && (
+        {!isPasswordless && !isResetting && (
           <div className="login-group">
             <label htmlFor="password" className="login-label">
               Password:
@@ -124,27 +147,60 @@ function Login() {
           </div>
         )}
 
-        <div className="login-checkbox-group">
-          <input
-            type="checkbox"
-            id="passwordless"
-            className="login-checkbox"
-            checked={isPasswordless}
-            onChange={(e) => setIsPasswordless(e.target.checked)}
-            disabled={isLoading}
-          />
-          <label htmlFor="passwordless">
-            Use passwordless login (via email link)
-          </label>
-        </div>
+        {!isResetting && !isPasswordless && (
+          <div className="login-forgot">
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => setIsResetting(true)}
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
 
-        <button
-          onClick={handleLogin}
-          disabled={isLoading}
-          className="login-button"
-        >
-          {isLoading ? "Logging in..." : "Login"}
-        </button>
+        {!isResetting && (
+          <div className="login-checkbox-group">
+            <input
+              type="checkbox"
+              id="passwordless"
+              className="login-checkbox"
+              checked={isPasswordless}
+              onChange={(e) => setIsPasswordless(e.target.checked)}
+              disabled={isLoading}
+            />
+            <label htmlFor="passwordless">
+              Use passwordless login (via email link)
+            </label>
+          </div>
+        )}
+
+        {isResetting ? (
+          <div className="login-actions">
+            <button
+              onClick={handlePasswordReset}
+              disabled={isLoading}
+              className="login-button"
+            >
+              {isLoading ? "Processing..." : "Reset Password"}
+            </button>
+            <button
+              onClick={() => setIsResetting(false)}
+              disabled={isLoading}
+              className="login-button login-button-secondary"
+            >
+              Back to Login
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleLogin}
+            disabled={isLoading}
+            className="login-button"
+          >
+            {isLoading ? "Processing..." : "Login"}
+          </button>
+        )}
       </div>
 
       <div className="login-footer">

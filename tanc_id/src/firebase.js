@@ -16,6 +16,34 @@ const firebaseConfig = {
   measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 };
 
+// Check if the environment variables are loaded
+const checkConfig = () => {
+  const missingVars = [];
+  Object.entries(firebaseConfig).forEach(([key, value]) => {
+    if (!value) missingVars.push(key);
+  });
+
+  if (missingVars.length > 0) {
+    console.error(
+      `Missing Firebase config variables: ${missingVars.join(", ")}`
+    );
+    console.error(
+      "Current environment variables loaded:",
+      Object.keys(process.env)
+        .filter((key) => key.startsWith("REACT_APP_"))
+        .map((key) => key)
+    );
+
+    console.warn(
+      "Firebase may not function correctly due to missing configuration."
+    );
+  } else {
+    console.log("Firebase configuration loaded successfully.");
+  }
+};
+
+checkConfig();
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);

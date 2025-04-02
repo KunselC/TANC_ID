@@ -1,0 +1,101 @@
+.confirmation-container {
+  max-width: 800px;
+  margin: 50px auto;
+  display: flex;
+  justify-content: center;
+}
+
+.confirmation-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 40px;
+  box-shadow: var(--box-shadow);
+  text-align: center;
+  width: 100%;
+}
+
+.confirmation-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  color: var(--success-color);
+}
+
+.confirmation-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.confirmation-message {
+  font-size: 1.25rem;
+  margin: 20px 0;
+  color: #555;
+}
+
+.confirmation-details {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 30px 0;
+  text-align: left;
+}
+
+.confirmation-details h2 {
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  color: var(--primary-color);
+}
+
+.confirmation-details ol {
+  margin-left: 20px;
+  margin-bottom: 15px;
+}
+
+.confirmation-details li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.confirmation-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.button {
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.primary-button {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.primary-button:hover {
+  background-color: #6b0000;
+}
+
+.secondary-button {
+  background-color: white;
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+}
+
+.secondary-button:hover {
+  background-color: #f9f9f9;
+}
+
+@media (max-width: 768px) {
+  .confirmation-card {
+    padding: 30px 20px;
+  }
+
+  .confirmation-actions {
+    flex-direction: column;
+  }
+}
