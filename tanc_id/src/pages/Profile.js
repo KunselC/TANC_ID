@@ -1,95 +1,91 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { updateEmail, updatePassword } from "firebase/auth";
+import { uploadToCloudinary } from "../cloudinary";
+import imageCompression from "browser-image-compression";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ImageWithFallback from "../components/ImageWithFallback";
-import { uploadToCloudinary, optimizeImageBeforeUpload } from "../cloudinary";
 import "../styles/Profile.css";
 
 function Profile() {
   const [userData, setUserData] = useState(null);
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    emailAddress: "",
+  });
+  const [newPhoto, setNewPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswordField, setShowPasswordField] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [newPhoto, setNewPhoto] = useState(null);
-  const [newPassword, setNewPassword] = useState("");
-  const [showPasswordField, setShowPasswordField] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
 
-    const fetchUserData = async () => {
+    const fetchProfileData = async () => {
+      setIsLoading(true);
+      setError("");
       try {
         const user = auth.currentUser;
         if (!user) {
-          navigate("/login", { replace: true });
+          navigate("/login");
           return;
         }
 
-        console.log("Fetching user data for:", user.uid);
+        let docRef;
+        let docSnap;
+        let fetchedData = {};
 
-        // Check if user exists in users collection
-        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const adminDocRef = doc(db, "admins", user.uid);
+        const adminDocSnap = await getDoc(adminDocRef);
 
-        if (!userDoc.exists()) {
-          // Check if user is an admin
-          const adminDoc = await getDoc(doc(db, "admins", user.uid));
-
-          if (adminDoc.exists()) {
-            // Allow admin to see their account info
-            console.log("User is an admin");
-            if (isMounted) {
-              const adminData = {
-                id: user.uid,
-                emailAddress: user.email || adminDoc.data().emailAddress,
-                firstName: adminDoc.data().firstName || "Admin",
-                lastName: adminDoc.data().lastName || "User",
-                isAdmin: true,
-              };
-              setUserData(adminData);
-              setFormData(adminData);
-              setIsLoading(false);
-            }
+        if (adminDocSnap.exists()) {
+          docRef = adminDocRef;
+          docSnap = adminDocSnap;
+          fetchedData = { ...docSnap.data(), id: user.uid, isAdmin: true };
+        } else {
+          docRef = doc(db, "users", user.uid);
+          docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            fetchedData = { ...docSnap.data(), id: user.uid, isAdmin: false };
+          } else {
+            setError(
+              "Profile data not found. Please complete your application or contact support."
+            );
+            setIsLoading(false);
             return;
           }
-
-          console.log("User not found in users or admins collection");
-          // Neither a user nor admin
-          if (isMounted) {
-            setError("Account not found. Please contact support.");
-            setIsLoading(false);
-          }
-          return;
         }
 
-        // Regular user data
-        console.log("User found in users collection");
-        const data = {
-          id: user.uid,
-          ...userDoc.data(),
-        };
-
         if (isMounted) {
-          setUserData(data);
-          setFormData(data);
+          setUserData(fetchedData);
+          setFormData({
+            firstName: fetchedData.firstName || "",
+            lastName: fetchedData.lastName || "",
+            emailAddress: fetchedData.emailAddress || user.email || "",
+          });
+          setPhotoPreview(fetchedData.photoUrl || null);
           setIsLoading(false);
         }
       } catch (err) {
-        console.error("Error fetching user data:", err);
+        console.error("Error fetching profile data:", err);
         if (isMounted) {
-          setError("Failed to load your profile information: " + err.message);
+          setError("Failed to load profile data: " + err.message);
           setIsLoading(false);
         }
       }
     };
 
-    fetchUserData();
+    fetchProfileData();
 
     return () => {
       isMounted = false;
@@ -98,24 +94,43 @@ function Profile() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handlePhotoChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+
+      if (!["image/png", "image/jpeg"].includes(file.type)) {
+        setError("Invalid file type. Please upload PNG or JPG.");
+        setNewPhoto(null);
+        setPhotoPreview(userData?.photoUrl || null);
+        e.target.value = null;
+        return;
+      }
+      setError("");
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+      };
       try {
-        // Optimize the image before setting it
-        const optimizedFile = await optimizeImageBeforeUpload(
-          e.target.files[0],
-          600
-        );
+        setMessage("Optimizing photo...");
+        const optimizedFile = await imageCompression(file, options);
         setNewPhoto(optimizedFile);
+        setMessage("");
       } catch (err) {
         console.error("Error optimizing image:", err);
-        setNewPhoto(e.target.files[0]); // Fallback to original file
+        setError("Could not optimize image, using original file.");
+        setNewPhoto(file);
+        setMessage("");
       }
     }
   };
@@ -126,320 +141,282 @@ function Profile() {
     setError("");
     setMessage("");
 
-    try {
-      const updates = { ...formData };
-      delete updates.id; // Remove id from updates object
-      delete updates.isAdmin; // Remove isAdmin flag
+    if (!formData.firstName || !formData.lastName) {
+      setError("First and last name cannot be empty.");
+      setIsUpdating(false);
+      return;
+    }
+    if (!formData.emailAddress || !/\S+@\S+\.\S+/.test(formData.emailAddress)) {
+      setError("Please enter a valid email address.");
+      setIsUpdating(false);
+      return;
+    }
+    if (showPasswordField) {
+      if (!newPassword || newPassword.length < 6) {
+        setError("New password must be at least 6 characters long.");
+        setIsUpdating(false);
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setError("New passwords do not match.");
+        setIsUpdating(false);
+        return;
+      }
+    }
 
-      // Handle photo upload if changed
+    try {
+      const updates = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        emailAddress: formData.emailAddress,
+      };
+
       if (newPhoto) {
         setMessage("Uploading photo...");
         const photoRes = await uploadToCloudinary(newPhoto);
         updates.photoUrl = photoRes.secure_url;
+        setMessage("");
       }
 
-      console.log("Updating profile with data:", updates);
+      const collectionName = userData.isAdmin ? "admins" : "users";
+      const docRef = doc(db, collectionName, userData.id);
 
-      if (!userData.isAdmin) {
-        // Update Firestore document for regular users
-        console.log("Updating user document:", userData.id);
-        await updateDoc(doc(db, "users", userData.id), updates);
-      } else {
-        // For admins, update the admin document
-        console.log("Updating admin document:", userData.id);
-        await updateDoc(doc(db, "admins", userData.id), {
-          firstName: updates.firstName,
-          lastName: updates.lastName,
-          emailAddress: updates.emailAddress,
-        });
+      const firestoreUpdates = {
+        firstName: updates.firstName,
+        lastName: updates.lastName,
+        emailAddress: updates.emailAddress,
+        updatedAt: Timestamp.now(),
+      };
+      if (updates.photoUrl && collectionName === "users") {
+        firestoreUpdates.photoUrl = updates.photoUrl;
       }
 
-      // Update email if changed
-      if (formData.emailAddress !== userData.emailAddress) {
-        console.log(
-          "Updating email from",
-          userData.emailAddress,
-          "to",
-          formData.emailAddress
-        );
+      await updateDoc(docRef, firestoreUpdates);
+
+      if (formData.emailAddress !== auth.currentUser.email) {
+        setMessage("Updating email...");
         await updateEmail(auth.currentUser, formData.emailAddress);
-        await auth.currentUser.getIdToken(true); // Force token refresh
+        await auth.currentUser.getIdToken(true);
+        setMessage("");
       }
 
-      // Update password if provided
-      if (newPassword) {
-        console.log("Updating password");
+      if (showPasswordField && newPassword) {
+        setMessage("Updating password...");
         await updatePassword(auth.currentUser, newPassword);
         setNewPassword("");
+        setConfirmPassword("");
         setShowPasswordField(false);
+        setMessage("");
       }
 
-      // Update local user data
-      setUserData({ ...userData, ...updates });
-
-      // Update any cached user data in localStorage
-      if (localStorage.getItem("userData")) {
-        const cachedData = JSON.parse(localStorage.getItem("userData"));
-        localStorage.setItem(
-          "userData",
-          JSON.stringify({ ...cachedData, ...updates })
-        );
+      const updatedLocalUserData = { ...userData, ...firestoreUpdates };
+      if (updates.photoUrl) {
+        updatedLocalUserData.photoUrl = updates.photoUrl;
       }
+      setUserData(updatedLocalUserData);
+      setFormData({
+        firstName: updatedLocalUserData.firstName,
+        lastName: updatedLocalUserData.lastName,
+        emailAddress: updatedLocalUserData.emailAddress,
+      });
+      setNewPhoto(null);
+      setPhotoPreview(updatedLocalUserData.photoUrl || null);
 
       setMessage("Profile updated successfully!");
-      setIsEditing(false);
     } catch (err) {
-      console.error("Error updating profile:", err);
-      setError(`Failed to update profile: ${err.message}`);
+      console.error("Profile update error:", err);
+      let userMessage = "Error updating profile: ";
+      if (err.code === "auth/requires-recent-login") {
+        userMessage +=
+          "This operation requires you to log in again for security reasons.";
+      } else if (err.code === "auth/email-already-in-use") {
+        userMessage +=
+          "This email address is already in use by another account.";
+      } else {
+        userMessage += err.message;
+      }
+      setError(userMessage);
+      setMessage("");
     } finally {
       setIsUpdating(false);
     }
   };
 
   if (isLoading) {
-    return <LoadingSpinner message="Loading your profile..." />;
+    return <LoadingSpinner message="Loading profile..." />;
+  }
+
+  if (error && !userData) {
+    return (
+      <div className="profile-container error-container">Error: {error}</div>
+    );
   }
 
   return (
     <div className="profile-container">
-      <h2>
-        My Profile{" "}
-        {userData?.isAdmin && <span className="admin-badge">Admin</span>}
-      </h2>
+      <h2>My Profile {userData?.isAdmin ? "(Admin)" : ""}</h2>
 
       {error && <div className="profile-error">{error}</div>}
-      {message && <div className="profile-success">{message}</div>}
+      {message && <div className="profile-message">{message}</div>}
 
-      <div className="profile-card">
-        {!isEditing ? (
-          <>
-            <div className="profile-header">
-              <div className="profile-photo">
-                {userData?.photoUrl ? (
-                  <ImageWithFallback
-                    src={userData.photoUrl}
-                    alt="Profile"
-                    className="profile-image"
-                  />
-                ) : (
-                  <div className="profile-image-placeholder">
-                    {userData?.firstName?.charAt(0)}
-                    {userData?.lastName?.charAt(0)}
-                  </div>
-                )}
-              </div>
-              <div className="profile-name">
-                <h3>
-                  {userData?.firstName}{" "}
-                  {userData?.middleName ? userData.middleName + " " : ""}
-                  {userData?.lastName}
-                </h3>
-                {!userData?.isAdmin && (
-                  <p>Member since: {userData?.memberSince}</p>
-                )}
-                {userData?.isAdmin && (
-                  <p className="admin-status">Administrator Account</p>
-                )}
-              </div>
-            </div>
-
-            <div className="profile-details">
-              <div className="detail-row">
-                <span className="detail-label">Email:</span>
-                <span className="detail-value">{userData?.emailAddress}</span>
-              </div>
-
-              {!userData?.isAdmin && (
-                <>
-                  <div className="detail-row">
-                    <span className="detail-label">Date of Birth:</span>
-                    <span className="detail-value">
-                      {userData?.dateOfBirth}
-                    </span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Gender:</span>
-                    <span className="detail-value">{userData?.gender}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Home Address:</span>
-                    <span className="detail-value">
-                      {userData?.homeAddress}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="profile-actions">
-              <button
-                onClick={() => setIsEditing(true)}
-                className="profile-edit-button"
-              >
-                Edit Profile
-              </button>
-              {!userData?.isAdmin && (
-                <button
-                  onClick={() => navigate("/my-id")}
-                  className="profile-view-id"
-                >
-                  View My ID
-                </button>
-              )}
-              {userData?.isAdmin && (
-                <button
-                  onClick={() => navigate("/admin-panel")}
-                  className="profile-admin-panel"
-                >
-                  Admin Panel
-                </button>
-              )}
-            </div>
-          </>
-        ) : (
-          <form onSubmit={handleSubmit} className="profile-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label>First Name</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="form-group">
-                <label>Last Name</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-
-            {!userData?.isAdmin && (
-              <div className="form-group">
-                <label>Middle Name</label>
-                <input
-                  type="text"
-                  name="middleName"
-                  value={formData.middleName || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-            )}
-
-            <div className="form-group">
-              <label>Email Address</label>
-              <input
-                type="email"
-                name="emailAddress"
-                value={formData.emailAddress || ""}
-                onChange={handleInputChange}
+      <form onSubmit={handleSubmit} className="profile-form">
+        <div className="profile-photo-section">
+          <label>Profile Photo</label>
+          <div className="photo-preview-container">
+            {userData && (
+              <ImageWithFallback
+                src={photoPreview || userData.photoUrl}
+                alt="Profile Photo"
+                className="profile-photo-current"
+                width="150"
+                height="150"
+                transformations="w_150,h_150,c_fill,g_face,f_auto,q_auto"
               />
-            </div>
-
-            {!userData?.isAdmin && (
-              <div className="form-group">
-                <label>Home Address</label>
-                <input
-                  type="text"
-                  name="homeAddress"
-                  value={formData.homeAddress || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
             )}
+          </div>
+          <input
+            type="file"
+            accept="image/png, image/jpeg"
+            onChange={handlePhotoChange}
+            disabled={isUpdating}
+            className="profile-file-input"
+          />
+          <p className="form-hint">
+            Upload a new photo (PNG or JPG). Will be optimized.
+          </p>
+        </div>
 
-            {!showPasswordField ? (
-              <div className="form-group">
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() => setShowPasswordField(true)}
-                >
-                  Change Password
-                </button>
+        <div className="profile-details-section">
+          <div className="form-group">
+            <label htmlFor="firstName" className="form-label required">
+              First Name
+            </label>
+            <input
+              id="firstName"
+              name="firstName"
+              className="form-input"
+              value={formData.firstName}
+              onChange={handleInputChange}
+              disabled={isUpdating}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="lastName" className="form-label required">
+              Last Name
+            </label>
+            <input
+              id="lastName"
+              name="lastName"
+              className="form-input"
+              value={formData.lastName}
+              onChange={handleInputChange}
+              disabled={isUpdating}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="emailAddress" className="form-label required">
+              Email Address
+            </label>
+            <input
+              id="emailAddress"
+              name="emailAddress"
+              type="email"
+              className="form-input"
+              value={formData.emailAddress}
+              onChange={handleInputChange}
+              disabled={isUpdating}
+            />
+          </div>
+
+          {userData && !userData.isAdmin && (
+            <>
+              <div className="form-group read-only">
+                <label className="form-label">Member Since</label>
+                <span>
+                  {userData.memberSince
+                    ? new Date(userData.memberSince).toLocaleDateString()
+                    : "N/A"}
+                </span>
               </div>
-            ) : (
-              <div className="form-group">
-                <label>New Password</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                />
-                <p className="form-hint">
-                  Leave blank to keep current password
-                </p>
+              <div className="form-group read-only">
+                <label className="form-label">Membership Expires</label>
+                <span>{getExpiryDateString(userData.expiresAt)}</span>
               </div>
+            </>
+          )}
+
+          <div className="password-update-section">
+            <button
+              type="button"
+              onClick={() => setShowPasswordField(!showPasswordField)}
+              className="text-button"
+              disabled={isUpdating}
+            >
+              {showPasswordField ? "Cancel Password Change" : "Change Password"}
+            </button>
+
+            {showPasswordField && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="newPassword" className="form-label required">
+                    New Password
+                  </label>
+                  <input
+                    id="newPassword"
+                    name="newPassword"
+                    type="password"
+                    className="form-input"
+                    placeholder="New Password (min 6 chars)"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={isUpdating}
+                  />
+                </div>
+                <div className="form-group">
+                  <label
+                    htmlFor="confirmPassword"
+                    className="form-label required"
+                  >
+                    Confirm New Password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    className="form-input"
+                    placeholder="Confirm New Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isUpdating}
+                  />
+                </div>
+              </>
             )}
+          </div>
 
-            {!userData?.isAdmin && (
-              <div className="form-group">
-                <label>Profile Photo</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  className="file-input"
-                />
-                {userData?.photoUrl && !newPhoto && (
-                  <div className="current-photo">
-                    <span>Current photo:</span>
-                    <img
-                      src={userData.photoUrl}
-                      alt="Current"
-                      width="100"
-                      className="thumbnail"
-                    />
-                  </div>
-                )}
-                {newPhoto && (
-                  <div className="new-photo">
-                    <span>New photo:</span>
-                    <img
-                      src={URL.createObjectURL(newPhoto)}
-                      alt="Preview"
-                      width="100"
-                      className="thumbnail"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="form-actions">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditing(false);
-                  setFormData(userData);
-                  setNewPhoto(null);
-                  setShowPasswordField(false);
-                  setNewPassword("");
-                }}
-                className="cancel-button"
-                disabled={isUpdating}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="save-button"
-                disabled={isUpdating}
-              >
-                {isUpdating ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
+          <button
+            type="submit"
+            className="profile-submit-button"
+            disabled={isUpdating}
+          >
+            {isUpdating ? <LoadingSpinner size="small" /> : "Update Profile"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
+
+const getExpiryDateString = (expiresAtTimestamp) => {
+  if (!expiresAtTimestamp || !expiresAtTimestamp.toDate) return "Unknown";
+  try {
+    return expiresAtTimestamp.toDate().toLocaleDateString();
+  } catch (err) {
+    console.error("Invalid expiry date format:", err);
+    return "Unknown";
+  }
+};
 
 export default Profile;

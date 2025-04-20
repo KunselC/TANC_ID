@@ -4,7 +4,7 @@ import {
   setPersistence,
   browserLocalPersistence,
 } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, Timestamp } from "firebase/firestore"; // Import Timestamp
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -18,34 +18,43 @@ const firebaseConfig = {
 
 // Check if the environment variables are loaded
 const checkConfig = () => {
-  const missingVars = [];
-  Object.entries(firebaseConfig).forEach(([key, value]) => {
-    if (!value) missingVars.push(key);
-  });
+  const requiredVars = [
+    "REACT_APP_FIREBASE_API_KEY",
+    "REACT_APP_FIREBASE_AUTH_DOMAIN",
+    "REACT_APP_FIREBASE_PROJECT_ID",
+    "REACT_APP_FIREBASE_STORAGE_BUCKET",
+    "REACT_APP_FIREBASE_MESSAGING_SENDER_ID",
+    "REACT_APP_FIREBASE_APP_ID",
+  ];
+  const missingVars = requiredVars.filter((key) => !process.env[key]);
 
   if (missingVars.length > 0) {
     console.error(
-      `Missing Firebase config variables: ${missingVars.join(", ")}`
-    );
-    console.error(
-      "Current environment variables loaded:",
-      Object.keys(process.env)
-        .filter((key) => key.startsWith("REACT_APP_"))
-        .map((key) => key)
+      `Missing Firebase config environment variables: ${missingVars.join(", ")}`
     );
 
     console.warn(
-      "Firebase may not function correctly due to missing configuration."
+      "Firebase may not function correctly due to missing configuration. Ensure your .env file is set up correctly."
     );
-  } else {
-    console.log("Firebase configuration loaded successfully.");
   }
 };
 
 checkConfig();
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-setPersistence(auth, browserLocalPersistence); // Set persistence mode
-export { auth, db };
+// Initialize Firebase
+let app;
+let auth;
+let db;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.error("Firebase Auth persistence error:", error);
+  });
+} catch (error) {
+  console.error("Firebase initialization failed:", error);
+}
+
+export { auth, db, Timestamp };

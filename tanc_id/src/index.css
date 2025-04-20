@@ -122,3 +122,18 @@ button:disabled {
   border: 1px solid var(--error-color);
   color: var(--error-color);
 }
+
+/* General Text Button Style */
+.text-button {
+  background: none;
+  border: none;
+  color: var(--primary-color); /* Or use a specific link color */
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.text-button:hover {
+  color: var(--accent-color); /* Adjust hover color if needed */
+}

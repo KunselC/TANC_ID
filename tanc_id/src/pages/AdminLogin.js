@@ -3,38 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import LoadingSpinner from "../components/LoadingSpinner";
 import "../styles/Login.css";
 
 function AdminLogin() {
   const [adminUser, setAdminUser] = useState("");
   const [adminPass, setAdminPass] = useState("");
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // Check if already authenticated as admin
+  // Redirect if already logged in as admin
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      const user = auth.currentUser;
-      if (user && localStorage.getItem("isAdmin") === "true") {
-        // Verify admin status from database
-        try {
-          const adminDoc = await getDoc(doc(db, "admins", user.uid));
-          if (adminDoc.exists()) {
-            navigate("/admin-panel");
-          }
-        } catch (err) {
-          console.error("Error verifying admin status:", err);
-        }
-      }
-    };
-
-    checkAdminStatus();
+    if (localStorage.getItem("isAdmin") === "true") {
+      navigate("/admin-panel");
+    }
   }, [navigate]);
 
-  const handleAdminLogin = async () => {
+  const handleLogin = async () => {
     if (!adminUser || !adminPass) {
-      setError("Please enter both email and password");
+      setError("Please enter both admin email and password.");
       return;
     }
 
@@ -42,8 +30,6 @@ function AdminLogin() {
     setError("");
 
     try {
-      console.log("Attempting admin login with:", adminUser);
-
       // Sign in the user
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -51,48 +37,47 @@ function AdminLogin() {
         adminPass
       );
       const user = userCredential.user;
-      console.log("User authenticated, checking admin status for:", user.uid);
 
       // Check if the user is an admin
       const adminDocRef = doc(db, "admins", user.uid);
       const adminDoc = await getDoc(adminDocRef);
 
-      console.log("Admin document exists:", adminDoc.exists());
-
       if (adminDoc.exists()) {
-        console.log("User confirmed as admin, navigating to panel");
         // Store admin status in local storage to persist between refreshes
         localStorage.setItem("isAdmin", "true");
         // Navigate to admin panel
         navigate("/admin-panel");
       } else {
         // User is not an admin, sign out and show error
-        console.log("User is not an admin, signing out");
         await auth.signOut();
-        localStorage.removeItem("isAdmin");
-        setError("You do not have access to the admin panel.");
+        setError("Access Denied: This account does not have admin privileges.");
       }
     } catch (err) {
       console.error("Admin login error:", err);
-      // More descriptive error messages
-      if (err.code === "auth/invalid-credential") {
-        setError("Invalid email or password.");
-      } else if (err.code === "auth/user-not-found") {
-        setError("No admin account exists with this email.");
-      } else if (err.code === "auth/network-request-failed") {
-        setError("Network error. Please check your connection.");
-      } else {
-        setError(`Login error: ${err.message}`);
+      let errorMessage = "An unexpected error occurred during login.";
+      switch (err.code) {
+        case "auth/invalid-credential":
+        case "auth/user-not-found":
+        case "auth/wrong-password":
+          errorMessage = "Invalid admin email or password.";
+          break;
+        case "auth/too-many-requests":
+          errorMessage = "Too many login attempts. Please try again later.";
+          break;
+        default:
+          errorMessage =
+            "Login failed. Please check your credentials or try again later.";
       }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Support for Enter key
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      handleAdminLogin();
+  // Allow login on Enter key press in password field
+  const handleKeyPress = (event) => {
+    if (event.key === "Enter" && !isLoading) {
+      handleLogin();
     }
   };
 
@@ -114,6 +99,7 @@ function AdminLogin() {
             id="admin-email"
             className="login-input"
             placeholder="Admin Email"
+            type="email"
             value={adminUser}
             onChange={(e) => setAdminUser(e.target.value)}
             disabled={isLoading}
@@ -138,11 +124,11 @@ function AdminLogin() {
         </div>
 
         <button
-          onClick={handleAdminLogin}
+          onClick={handleLogin}
           disabled={isLoading}
           className="login-button"
         >
-          {isLoading ? "Logging in..." : "Login as Admin"}
+          {isLoading ? <LoadingSpinner size="small" /> : "Login"}
         </button>
       </div>
     </div>

@@ -1,15 +1,19 @@
 import React from "react";
 import { useLocation, Link } from "react-router-dom";
+import {
+  ApplicationIcon,
+  IdCardIcon,
+  SecurityIcon, // Use SecurityIcon instead of CheckCircleIcon
+} from "../components/Icons";
 import "../styles/Confirmation.css";
-import { IdCardIcon, ApplicationIcon } from "../components/Icons";
 
 function Confirmation() {
   const location = useLocation();
-  const { type, name, wantId } = location.state || {
-    type: "generic",
-    name: "Member",
-    wantId: false,
-  };
+  const {
+    type = "generic",
+    name = "Member",
+    wantId = false,
+  } = location.state || {};
 
   const renderContent = () => {
     switch (type) {
@@ -26,17 +30,17 @@ function Confirmation() {
             <div className="confirmation-details">
               <h2>What happens next?</h2>
               <ol>
-                <li>Our admin team will review your application</li>
+                <li>Our admin team will review your application.</li>
                 <li>
-                  You'll receive an email when your application is approved
+                  You'll receive an email when your application is approved.
                 </li>
                 <li>
-                  Once approved, you can log in to access your digital ID card
+                  Once approved, you can log in to access your digital ID card.
                 </li>
                 {wantId && (
                   <li>
-                    Your physical ID card will be prepared for pickup at the
-                    TANC office
+                    Your physical ID card request has been noted. Please contact
+                    the TANC office regarding pickup/mailing after approval.
                   </li>
                 )}
               </ol>
@@ -59,10 +63,42 @@ function Confirmation() {
             </p>
             <div className="confirmation-details">
               <p>
-                Your membership is now active. You can now access your digital
-                ID.
+                Your membership is now active/renewed. You can access your
+                digital ID.
               </p>
             </div>
+          </>
+        );
+
+      case "renewal":
+        return (
+          <>
+            <div className="confirmation-icon">
+              <SecurityIcon /> {/* Use SecurityIcon */}
+            </div>
+            <h1>Renewal Submitted, {name}!</h1>
+            <p className="confirmation-message">
+              Your membership renewal application has been sent successfully.
+            </p>
+            <div className="confirmation-details">
+              <h2>Next Steps:</h2>
+              <ol>
+                <li>Our admin team will review your renewal request.</li>
+                <li>You'll receive an email upon approval.</li>
+                <li>
+                  <strong>Important:</strong> Remember to pay the $100 renewal
+                  fee for 5 years. Contact the TANC office for payment options.
+                </li>
+                <li>
+                  Your membership expiry date will be updated upon approval and
+                  payment confirmation.
+                </li>
+              </ol>
+            </div>
+            <p>
+              You can check your profile or ID page later for the updated expiry
+              date after approval.
+            </p>
           </>
         );
 
@@ -90,6 +126,11 @@ function Confirmation() {
           {type === "application" && (
             <Link to="/login" className="button secondary-button">
               Go to Login
+            </Link>
+          )}
+          {type === "renewal" && (
+            <Link to="/my-id" className="button secondary-button">
+              Check My ID Status
             </Link>
           )}
           {type === "payment" && (

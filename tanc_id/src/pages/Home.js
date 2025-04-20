@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { IdCardIcon, ApplicationIcon, SecurityIcon } from "../components/Icons";
 import "../styles/Home.css";
 import tancLogo from "../assets/images/tanc-logo.jpg";
-import SystemStatus from "../components/SystemStatus";
 
 function Home() {
   return (
@@ -64,8 +63,6 @@ function Home() {
           cultural events, and educational programs.
         </p>
       </section>
-
-      <SystemStatus />
     </div>
   );
 }

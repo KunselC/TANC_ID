@@ -10,8 +10,8 @@
 .hero {
   background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
     url("https://upload.wikimedia.org/wikipedia/commons/3/3c/Tibet_-_Potala_Palace.jpg");
-  background-size: cover;
-  background-position: center;
+  background-size: 120%; /* Zoom in slightly */
+  background-position: center; /* Keep it centered */
   color: white;
   text-align: center;
   padding: 60px 20px;
@@ -22,9 +22,16 @@
 }
 
 .hero-logo {
-  height: 80px;
+  height: 120px; /* Increase height for a larger logo */
   margin-bottom: 20px;
-  filter: brightness(0) invert(1);
+  /* filter: brightness(0) invert(1); Removed this line */
+  background-color: white; /* Add white background */
+  padding: 10px; /* Add padding around the logo */
+  border-radius: 8px; /* Optional: Add rounded corners */
+  display: block; /* Make it a block element for centering */
+  margin-left: auto; /* Center the block */
+  margin-right: auto; /* Center the block */
+  max-width: fit-content; /* Ensure the background fits the content + padding */
 }
 
 .hero h1 {
@@ -130,6 +137,12 @@
   font-family: var(--font-heading);
   color: var(--primary-color);
   margin-bottom: 20px;
+}
+
+.info-section-logo {
+  display: block;
+  margin: 0 auto 20px;
+  height: 60px;
 }
 
 @media (max-width: 768px) {

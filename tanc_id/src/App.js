@@ -17,6 +17,7 @@ import AdminPanel from "./pages/AdminPanel";
 import IDView from "./pages/IDView";
 import Profile from "./pages/Profile";
 import Confirmation from "./pages/Confirmation";
+import RenewalApplication from "./pages/RenewalApplication"; // Import the new component
 import LoadingSpinner from "./components/LoadingSpinner";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./styles/App.css";
@@ -152,6 +153,10 @@ function App() {
                 element={user ? <Profile /> : <Navigate to="/login" />}
               />
               <Route path="/confirmation" element={<Confirmation />} />
+              <Route
+                path="/renewal-application"
+                element={<RenewalApplication />}
+              />
             </Routes>
           </main>
           <footer className="footer">

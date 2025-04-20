@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import {
@@ -9,6 +9,7 @@ import {
   updateDoc,
   query,
   orderBy,
+  where,
   deleteDoc,
   setDoc,
   Timestamp,
@@ -16,7 +17,33 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner";
 import UserDetails from "../components/UserDetails";
 import ImageWithFallback from "../components/ImageWithFallback";
+import SystemStatus from "../components/SystemStatus";
 import "../styles/AdminPanel.css";
+
+// Explanation: applications collection stores all submitted applications (new/renewal, pending/approved/rejected).
+// users collection stores the current state of actual members (active/expired), created/updated upon application approval.
+
+// Helper function to calculate expiry date (5 years from a given date)
+const calculateExpiryDateFromDate = (fromDate) => {
+  try {
+    const startDate = new Date(fromDate);
+    if (isNaN(startDate.getTime())) {
+      console.warn("Invalid date provided for expiry calculation:", fromDate);
+      // Default to 5 years from now if date is invalid
+      const defaultDate = new Date();
+      defaultDate.setFullYear(defaultDate.getFullYear() + 5);
+      return Timestamp.fromDate(defaultDate);
+    }
+    startDate.setFullYear(startDate.getFullYear() + 5);
+    return Timestamp.fromDate(startDate);
+  } catch (err) {
+    console.error("Error calculating expiry date:", err);
+    // Default to 5 years from now in case of any error
+    const defaultDate = new Date();
+    defaultDate.setFullYear(defaultDate.getFullYear() + 5);
+    return Timestamp.fromDate(defaultDate);
+  }
+};
 
 function AdminPanel() {
   const [applications, setApplications] = useState([]);
@@ -28,92 +55,67 @@ function AdminPanel() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [actionStatus, setActionStatus] = useState("");
   const [actionType, setActionType] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(null);
+  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [userFilterStatus, setUserFilterStatus] = useState("all");
+  const [userSortBy, setUserSortBy] = useState("name");
   const navigate = useNavigate();
 
-  // Initial data loading
   useEffect(() => {
     let isMounted = true;
-
     const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        setIsLoading(true);
-
-        // Check if user is authenticated
         const user = auth.currentUser;
         if (!user) {
-          console.log("No user found, redirecting to admin login");
           navigate("/admin-login");
           return;
         }
 
-        // Check if user is admin
-        console.log("Checking admin status for:", user.uid);
         const adminDocRef = doc(db, "admins", user.uid);
         const adminDoc = await getDoc(adminDocRef);
 
         if (!adminDoc.exists()) {
-          console.log("User is not an admin, redirecting to admin login");
           navigate("/admin-login");
           localStorage.removeItem("isAdmin");
           return;
         }
 
-        console.log("Admin authenticated successfully, fetching data...");
+        // Fetch Pending Applications (New and Renewal)
+        const appQuery = query(
+          collection(db, "applications"),
+          where("status", "==", "pending"),
+          orderBy("submittedAt", "desc")
+        );
+        const appSnapshot = await getDocs(appQuery);
+        const fetchedApplications = appSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
 
-        // Fetch applications with detailed error handling
-        try {
-          const applicationsRef = collection(db, "applications");
-          const applicationsQuery = query(
-            applicationsRef,
-            orderBy("createdAt", "desc")
-          );
+        // Fetch All Users
+        const usersQuery = query(
+          collection(db, "users"),
+          orderBy("createdAt", "desc")
+        );
+        const usersSnapshot = await getDocs(usersQuery);
+        const fetchedUsers = usersSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
 
-          const querySnapshot = await getDocs(applicationsQuery);
-
-          const applicationsData = [];
-          querySnapshot.forEach((doc) => {
-            applicationsData.push({
-              id: doc.id,
-              ...doc.data(),
-            });
-          });
-          console.log("Fetched applications:", applicationsData.length);
-          if (isMounted) setApplications(applicationsData);
-        } catch (appError) {
-          console.error("Error fetching applications:", appError);
-          if (isMounted)
-            setError("Failed to load applications: " + appError.message);
-        }
-
-        // Fetch users with separate error handling
-        try {
-          const usersRef = collection(db, "users");
-          const usersSnapshot = await getDocs(usersRef);
-
-          const usersData = [];
-          usersSnapshot.forEach((doc) => {
-            usersData.push({
-              id: doc.id,
-              ...doc.data(),
-            });
-          });
-          console.log("Fetched users:", usersData.length);
-          if (isMounted) setUsers(usersData);
-        } catch (usersError) {
-          console.error("Error fetching users:", usersError);
-          if (isMounted)
-            setError((prev) =>
-              prev
-                ? prev + " Also failed to load users."
-                : "Failed to load users: " + usersError.message
-            );
-        }
-
-        if (isMounted) setIsLoading(false);
-      } catch (error) {
-        console.error("Error in admin panel data fetch:", error);
         if (isMounted) {
-          setError(`Failed to load admin data: ${error.message}`);
+          setApplications(fetchedApplications);
+          setUsers(fetchedUsers);
+        }
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        if (isMounted) {
+          setError("Failed to load data: " + err.message);
+        }
+      } finally {
+        if (isMounted) {
           setIsLoading(false);
         }
       }
@@ -124,23 +126,23 @@ function AdminPanel() {
     return () => {
       isMounted = false;
     };
-  }, [navigate]);
+  }, [navigate]); // Add navigate to the dependency array
 
-  // Approve application handler
   const handleApprove = async (application) => {
-    setSelectedApplication(application);
-    setActionType("approve");
     setActionStatus("Processing...");
+    const isRenewal = application.type === "renewal";
+    const now = Timestamp.now();
 
     try {
-      // Update the application status
+      // Simplify update: only set status and approvedAt
       await updateDoc(doc(db, "applications", application.id), {
-        approved: true,
-        approvedAt: Timestamp.now(),
+        status: "approved",
+        approvedAt: now,
       });
 
-      // Create a new user record with the application data
-      const userData = {
+      const newExpiryDate = calculateExpiryDateFromDate(now.toDate());
+
+      const userDataForUpdate = {
         firstName: application.firstName,
         middleName: application.middleName || "",
         lastName: application.lastName,
@@ -151,137 +153,176 @@ function AdminPanel() {
         homeAddress: application.homeAddress,
         photoUrl: application.headShotUrl || "",
         status: "active",
-        createdAt: Timestamp.now(),
-        expiresAt: calculateExpiryDate(application.memberSince),
+        expiresAt: newExpiryDate,
         userId: application.userId,
+        updatedAt: now,
+        ...(isRenewal ? {} : { createdAt: now }),
       };
 
-      // Save the user data to Firestore
-      await setDoc(doc(db, "users", application.userId), userData);
+      await setDoc(doc(db, "users", application.userId), userDataForUpdate, {
+        merge: true,
+      });
 
-      // Update local state
       setApplications((prevApplications) =>
-        prevApplications.map((app) =>
-          app.id === application.id ? { ...app, approved: true } : app
-        )
+        prevApplications.filter((app) => app.id !== application.id)
       );
-      setUsers((prevUsers) => [
-        ...prevUsers,
-        { id: application.userId, ...userData },
-      ]);
+      setUsers((prevUsers) => {
+        const existingUserIndex = prevUsers.findIndex(
+          (u) => u.id === application.userId
+        );
+        const updatedUser = { id: application.userId, ...userDataForUpdate };
+        if (existingUserIndex > -1) {
+          const updatedUsers = [...prevUsers];
+          updatedUsers[existingUserIndex] = updatedUser;
+          return updatedUsers;
+        } else {
+          return [...prevUsers, updatedUser];
+        }
+      });
 
-      setActionStatus("Application approved successfully!");
+      setActionStatus(
+        `Application ${isRenewal ? "renewal " : ""}approved successfully!`
+      );
+      setSelectedApplication(null);
+      setActionType(null);
     } catch (error) {
-      console.error("Error approving application:", error);
-      setActionStatus(`Error: ${error.message}`);
+      console.error(
+        `Error approving ${isRenewal ? "renewal " : ""}application:`,
+        error
+      );
+      setActionStatus(`Error approving application: ${error.message}`);
+      setSelectedApplication((prev) =>
+        prev ? { ...prev, status: "pending" } : null
+      );
+      setActionType("view");
     }
   };
 
-  // Reject application handler
   const handleReject = async (application) => {
-    setSelectedApplication(application);
-    setActionType("reject");
     setActionStatus("Processing...");
+    const isRenewal = application.type === "renewal";
 
     try {
-      // Update the application status
+      // Simplify update: only set status and rejectedAt
       await updateDoc(doc(db, "applications", application.id), {
-        rejected: true,
+        status: "rejected",
         rejectedAt: Timestamp.now(),
       });
 
-      // Update local state
       setApplications((prevApplications) =>
-        prevApplications.map((app) =>
-          app.id === application.id ? { ...app, rejected: true } : app
-        )
+        prevApplications.filter((app) => app.id !== application.id)
       );
 
-      setActionStatus("Application rejected successfully!");
+      setActionStatus(
+        `Application ${isRenewal ? "renewal " : ""}rejected successfully!`
+      );
+      setSelectedApplication(null);
+      setActionType(null);
     } catch (error) {
-      console.error("Error rejecting application:", error);
-      setActionStatus(`Error: ${error.message}`);
+      console.error(
+        `Error rejecting ${isRenewal ? "renewal " : ""}application:`,
+        error
+      );
+      setActionStatus(`Error rejecting application: ${error.message}`);
+      setSelectedApplication((prev) =>
+        prev ? { ...prev, status: "pending" } : null
+      );
+      setActionType("view");
     }
   };
 
-  // Delete application handler
-  const handleDelete = async (application) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this application? This cannot be undone."
-      )
-    ) {
-      setSelectedApplication(application);
-      setActionType("delete");
-      setActionStatus("Processing...");
-
-      try {
-        // Delete the application
-        await deleteDoc(doc(db, "applications", application.id));
-
-        // Update local state
-        setApplications((prevApplications) =>
-          prevApplications.filter((app) => app.id !== application.id)
-        );
-
-        setActionStatus("Application deleted successfully!");
-        setSelectedApplication(null);
-      } catch (error) {
-        console.error("Error deleting application:", error);
-        setActionStatus(`Error: ${error.message}`);
-      }
-    }
+  const handleDeleteInitiate = (application) => {
+    setConfirmingDelete(application.id);
+    setSelectedApplication(application);
+    setActionType("view");
+    setActionStatus("");
   };
 
-  // Helper function to calculate expiry date (5 years from member since date)
-  const calculateExpiryDate = (memberSince) => {
+  const handleDeleteConfirm = async (application) => {
+    if (!application || confirmingDelete !== application.id) return;
+
+    setActionType("delete");
+    setActionStatus("Processing delete...");
+
     try {
-      const date = new Date(memberSince);
-      date.setFullYear(date.getFullYear() + 5);
-      return Timestamp.fromDate(date);
-    } catch (err) {
-      console.error("Invalid date format:", err);
-      // Default to 5 years from now
-      const defaultDate = new Date();
-      defaultDate.setFullYear(defaultDate.getFullYear() + 5);
-      return Timestamp.fromDate(defaultDate);
+      await deleteDoc(doc(db, "applications", application.id));
+
+      setApplications((prevApplications) =>
+        prevApplications.filter((app) => app.id !== application.id)
+      );
+
+      setActionStatus("Application deleted successfully!");
+      setSelectedApplication(null);
+      setConfirmingDelete(null);
+      setActionType(null);
+    } catch (error) {
+      console.error("Error deleting application:", error);
+      setActionStatus(`Error deleting application: ${error.message}`);
+      setConfirmingDelete(null);
+      setActionType("view");
     }
   };
 
-  // Filter applications based on active tab
-  const filteredApplications = applications.filter((application) => {
-    switch (activeTab) {
-      case "pending":
-        return !application.approved && !application.rejected;
-      case "approved":
-        return application.approved;
-      case "rejected":
-        return application.rejected;
-      default:
-        return true;
-    }
-  });
+  const handleDeleteCancel = () => {
+    setConfirmingDelete(null);
+  };
 
-  // Handle view application details
+  const filteredAndSortedUsers = useMemo(() => {
+    const now = new Date();
+    return users
+      .filter((user) => {
+        const searchTermLower = userSearchTerm.toLowerCase();
+        const nameMatch =
+          user.firstName?.toLowerCase().includes(searchTermLower) ||
+          user.lastName?.toLowerCase().includes(searchTermLower) ||
+          `${user.firstName} ${user.lastName}`
+            .toLowerCase()
+            .includes(searchTermLower);
+        const emailMatch = user.emailAddress
+          ?.toLowerCase()
+          .includes(searchTermLower);
+        if (!nameMatch && !emailMatch) {
+          return false;
+        }
+
+        if (userFilterStatus !== "all") {
+          const isExpired = user.expiresAt?.toDate() < now;
+          if (userFilterStatus === "active" && isExpired) return false;
+          if (userFilterStatus === "expired" && !isExpired) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (userSortBy === "name") {
+          const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+          const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+          return nameA.localeCompare(nameB);
+        } else if (userSortBy === "expiry") {
+          const dateA = a.expiresAt?.toDate() || 0;
+          const dateB = b.expiresAt?.toDate() || 0;
+          return dateA - dateB;
+        }
+        return 0;
+      });
+  }, [users, userSearchTerm, userFilterStatus, userSortBy]);
+
   const handleViewApplication = (application) => {
     setSelectedApplication(application);
     setActionType("view");
     setActionStatus("");
   };
 
-  // Handle view user details
   const handleViewUser = (user) => {
     setSelectedUser(user);
   };
 
-  // Handle closing application details view
   const handleCloseApplicationDetails = () => {
     setSelectedApplication(null);
     setActionType(null);
     setActionStatus("");
   };
 
-  // Handle retry for errors
   const handleRetry = () => {
     setError(null);
     setIsLoading(true);
@@ -290,12 +331,10 @@ function AdminPanel() {
     }, 500);
   };
 
-  // Render loading state
   if (isLoading) {
     return <LoadingSpinner message="Loading admin panel..." />;
   }
 
-  // Render error state
   if (error) {
     return (
       <div className="admin-container error-container">
@@ -308,12 +347,14 @@ function AdminPanel() {
     );
   }
 
-  // Render application details
   if (selectedApplication && actionType === "view") {
     return (
       <div className="admin-container">
         <div className="admin-header">
-          <h2>Application Details</h2>
+          <h2>
+            Application Details (
+            {selectedApplication.type === "renewal" ? "Renewal" : "New"})
+          </h2>
           <button
             onClick={handleCloseApplicationDetails}
             className="back-button"
@@ -350,6 +391,11 @@ function AdminPanel() {
               <strong>Want ID:</strong>{" "}
               {selectedApplication.wantId ? "Yes" : "No"}
             </p>
+            <p>
+              <strong>Submitted:</strong>{" "}
+              {selectedApplication.submittedAt?.toDate().toLocaleString() ||
+                "N/A"}
+            </p>
           </div>
 
           <div className="application-images">
@@ -362,7 +408,8 @@ function AdminPanel() {
                   src={selectedApplication.greenBookUrl}
                   alt="Green Book"
                   className="application-image"
-                  width="200"
+                  width="200" // Keep for layout hint
+                  transformations="w_200,h_200,c_limit,f_auto,q_auto" // Add transformations
                 />
               </div>
             )}
@@ -376,42 +423,66 @@ function AdminPanel() {
                   src={selectedApplication.headShotUrl}
                   alt="Head Shot"
                   className="application-image"
-                  width="200"
+                  width="200" // Keep for layout hint
+                  transformations="w_200,h_200,c_fill,g_face,f_auto,q_auto" // Add transformations (fill, face detection)
                 />
               </div>
             )}
           </div>
 
           <div className="application-actions">
-            {!selectedApplication.approved && !selectedApplication.rejected && (
-              <>
-                <button
-                  onClick={() => handleApprove(selectedApplication)}
-                  className="approve-button"
-                >
-                  Approve Application
-                </button>
-                <button
-                  onClick={() => handleReject(selectedApplication)}
-                  className="reject-button"
-                >
-                  Reject Application
-                </button>
-              </>
-            )}
             <button
-              onClick={() => handleDelete(selectedApplication)}
-              className="delete-button"
+              onClick={() => handleApprove(selectedApplication)}
+              className="approve-button"
+              disabled={actionStatus.includes("Processing")}
             >
-              Delete Application
+              Approve{" "}
+              {selectedApplication.type === "renewal"
+                ? "Renewal"
+                : "Application"}
             </button>
+            <button
+              onClick={() => handleReject(selectedApplication)}
+              className="reject-button"
+              disabled={actionStatus.includes("Processing")}
+            >
+              Reject{" "}
+              {selectedApplication.type === "renewal"
+                ? "Renewal"
+                : "Application"}
+            </button>
+
+            {confirmingDelete !== selectedApplication.id ? (
+              <button
+                onClick={() => handleDeleteInitiate(selectedApplication)}
+                className="delete-button"
+                disabled={actionStatus.includes("Processing")}
+              >
+                Delete Application
+              </button>
+            ) : (
+              <div className="confirmation-buttons">
+                <span>Are you sure?</span>
+                <button
+                  onClick={() => handleDeleteConfirm(selectedApplication)}
+                  className="confirm-delete-button"
+                >
+                  Yes, Delete
+                </button>
+                <button
+                  onClick={handleDeleteCancel}
+                  className="cancel-delete-button"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  // Action feedback view
   if (selectedApplication && actionType && actionType !== "view") {
     return (
       <div className="admin-container">
@@ -435,7 +506,6 @@ function AdminPanel() {
     );
   }
 
-  // Main admin panel view
   return (
     <div className="admin-container">
       <h2>Admin Panel</h2>
@@ -445,22 +515,21 @@ function AdminPanel() {
           className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
           onClick={() => setActiveTab("pending")}
         >
-          Pending Applications (
-          {applications.filter((app) => !app.approved && !app.rejected).length})
+          Pending Applications ({applications.length})
         </button>
         <button
           className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
           onClick={() => setActiveTab("approved")}
         >
           Approved Applications (
-          {applications.filter((app) => app.approved).length})
+          {applications.filter((app) => app.status === "approved").length})
         </button>
         <button
           className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
           onClick={() => setActiveTab("rejected")}
         >
           Rejected Applications (
-          {applications.filter((app) => app.rejected).length})
+          {applications.filter((app) => app.status === "rejected").length})
         </button>
         <button
           className={`tab-button ${activeTab === "users" ? "active" : ""}`}
@@ -477,7 +546,18 @@ function AdminPanel() {
             Applications
           </h3>
 
-          {filteredApplications.length === 0 ? (
+          {applications.filter((application) => {
+            switch (activeTab) {
+              case "pending":
+                return application.status === "pending";
+              case "approved":
+                return application.status === "approved";
+              case "rejected":
+                return application.status === "rejected";
+              default:
+                return true;
+            }
+          }).length === 0 ? (
             <p className="no-data">No {activeTab} applications found.</p>
           ) : (
             <table className="admin-table">
@@ -491,107 +571,181 @@ function AdminPanel() {
                 </tr>
               </thead>
               <tbody>
-                {filteredApplications.map((application) => (
-                  <tr key={application.id}>
-                    <td>
-                      {application.firstName} {application.lastName}
-                    </td>
-                    <td>{application.emailAddress}</td>
-                    <td>{application.dateOfBirth}</td>
-                    <td>
-                      {application.createdAt
-                        ? new Date(application.createdAt).toLocaleDateString()
-                        : "Unknown"}
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => handleViewApplication(application)}
-                        className="view-button"
-                      >
-                        View
-                      </button>
-                      {activeTab === "pending" && (
-                        <>
-                          <button
-                            onClick={() => handleApprove(application)}
-                            className="approve-button small"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReject(application)}
-                            className="reject-button small"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {applications
+                  .filter((application) => {
+                    switch (activeTab) {
+                      case "pending":
+                        return application.status === "pending";
+                      case "approved":
+                        return application.status === "approved";
+                      case "rejected":
+                        return application.status === "rejected";
+                      default:
+                        return true;
+                    }
+                  })
+                  .map((application) => (
+                    <tr key={application.id}>
+                      <td>
+                        {application.firstName} {application.lastName}
+                      </td>
+                      <td>{application.emailAddress}</td>
+                      <td>{application.dateOfBirth}</td>
+                      <td>
+                        {application.submittedAt
+                          ? application.submittedAt
+                              .toDate()
+                              .toLocaleDateString()
+                          : "Unknown"}
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => handleViewApplication(application)}
+                          className="view-button"
+                        >
+                          View
+                        </button>
+                        {activeTab === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(application)}
+                              className="approve-button small"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(application)}
+                              className="reject-button small"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           )}
         </div>
       ) : (
         <div className="user-list">
-          <h3>All Users</h3>
+          <h3>All Users ({filteredAndSortedUsers.length})</h3>
 
-          {users.length === 0 ? (
-            <p className="no-data">No users found.</p>
+          <div className="user-controls">
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={userSearchTerm}
+              onChange={(e) => setUserSearchTerm(e.target.value)}
+              className="user-search-input"
+            />
+            <select
+              value={userFilterStatus}
+              onChange={(e) => setUserFilterStatus(e.target.value)}
+              className="user-filter-select"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="expired">Expired</option>
+            </select>
+            <select
+              value={userSortBy}
+              onChange={(e) => setUserSortBy(e.target.value)}
+              className="user-sort-select"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="expiry">Sort by Expiry Date</option>
+            </select>
+          </div>
+
+          {isLoading ? (
+            <LoadingSpinner message="Loading users..." />
+          ) : error ? (
+            <p className="error-message">{error}</p>
+          ) : filteredAndSortedUsers.length === 0 ? (
+            <p className="no-data">No users match your criteria.</p>
           ) : (
-            <table className="admin-table">
+            <table className="admin-table users-table">
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
                   <th>Member Since</th>
-                  <th>Expires</th>
+                  <th>Expires At</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td>
-                      {user.firstName} {user.lastName}
-                    </td>
-                    <td>{user.emailAddress}</td>
-                    <td>{user.memberSince}</td>
-                    <td>
-                      {user.expiresAt
-                        ? user.expiresAt.toDate
-                          ? user.expiresAt.toDate().toLocaleDateString()
-                          : new Date(user.expiresAt).toLocaleDateString()
-                        : "Unknown"}
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => handleViewUser(user)}
-                        className="view-button"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredAndSortedUsers.map((user) => {
+                  const expiryDate = user.expiresAt?.toDate();
+                  const isExpired = expiryDate < new Date();
+                  const statusText = isExpired ? "Expired" : "Active";
+
+                  return (
+                    <tr
+                      key={user.id}
+                      className={isExpired ? "expired-user" : ""}
+                    >
+                      <td>
+                        {user.firstName} {user.lastName}
+                      </td>
+                      <td>{user.emailAddress}</td>
+                      <td>
+                        {user.memberSince
+                          ? new Date(user.memberSince).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                      <td>
+                        {expiryDate
+                          ? expiryDate.toLocaleDateString()
+                          : "Unknown"}
+                      </td>
+                      <td>
+                        <span
+                          className={`status-badge ${statusText.toLowerCase()}`}
+                        >
+                          {statusText}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => handleViewUser(user)}
+                          className="view-button small"
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </div>
       )}
 
-      {/* User Details Modal */}
       {selectedUser && (
         <div className="modal-backdrop">
           <div className="modal-content">
             <UserDetails
               user={selectedUser}
               onClose={() => setSelectedUser(null)}
-            />
+            >
+              <ImageWithFallback
+                src={selectedUser.photoUrl}
+                alt={`${selectedUser.firstName} ${selectedUser.lastName}`}
+                className="user-detail-photo"
+                width="150" // Keep for layout hint
+                transformations="w_150,h_150,c_fill,g_face,f_auto,q_auto" // Add transformations
+              />
+            </UserDetails>
           </div>
         </div>
       )}
+
+      <SystemStatus />
     </div>
   );
 }
