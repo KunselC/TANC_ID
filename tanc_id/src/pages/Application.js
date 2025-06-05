@@ -23,6 +23,7 @@ function Application() {
     wantId: false,
     email: "",
     password: "",
+    paymentMethod: "", // Added paymentMethod
   });
 
   const [status, setStatus] = useState("");
@@ -30,7 +31,7 @@ function Application() {
   const [errors, setErrors] = useState({});
   const [statusType, setStatusType] = useState("");
   const [step, setStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 4; // Increased total steps
 
   const validateForm = () => {
     const newErrors = {};
@@ -50,6 +51,7 @@ function Application() {
     else if (formData.password.length < 6)
       newErrors.password = "Password must be at least 6 characters";
     if (!formData.headShot) newErrors.headShot = "Head shot photo is required";
+    if (step === 4 && !formData.paymentMethod) newErrors.paymentMethod = "Payment method is required"; // Added payment method validation
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -77,6 +79,8 @@ function Application() {
         setStep(2);
       } else if (["headShot"].includes(firstErrorField)) {
         setStep(3);
+      } else if (["paymentMethod"].includes(firstErrorField)) {
+        setStep(4);
       }
       return;
     }
@@ -124,6 +128,7 @@ function Application() {
         greenBookUrl: greenBookUrl,
         headShotUrl: headShotUrl,
         wantId: formData.wantId,
+        paymentMethod: formData.paymentMethod, // Added paymentMethod
         status: "pending",
         submittedAt: Timestamp.now(),
         type: "new",
@@ -136,6 +141,7 @@ function Application() {
           type: "application",
           name: formData.firstName,
           wantId: formData.wantId,
+          paymentMethod: formData.paymentMethod, // Pass paymentMethod to confirmation
         },
       });
     } catch (err) {
@@ -183,6 +189,8 @@ function Application() {
     } else if (currentStep === 3) {
       if (!formData.headShot)
         newErrors.headShot = "Head shot photo is required";
+    } else if (currentStep === 4) { // Added validation for payment step
+      if (!formData.paymentMethod) newErrors.paymentMethod = "Payment method is required";
     }
 
     setErrors(newErrors);
@@ -271,7 +279,9 @@ function Application() {
                 ? "Personal Info"
                 : i === 1
                 ? "Account Setup"
-                : "Documents"}
+                : i === 2
+                ? "Documents"
+                : "Payment"} 
             </div>
           </div>
         ))}
@@ -519,17 +529,59 @@ function Application() {
               </label>
             </div>
           </div>
+        </>
+      )}
 
+      {step === 4 && ( // Added payment step UI
+        <>
+          <div className="form-group">
+            <label className="form-label required">Payment Method</label>
+            <select
+              className={`form-select ${errors.paymentMethod ? "error" : ""}`}
+              value={formData.paymentMethod}
+              onChange={(e) => {
+                setFormData({ ...formData, paymentMethod: e.target.value });
+                if (errors.paymentMethod)
+                  setErrors({ ...errors, paymentMethod: undefined });
+              }}
+            >
+              <option value="">Select Payment Method...</option>
+              <option value="cash">Cash (In Person)</option>
+              <option value="check">Check</option>
+              <option value="online">Online Payment</option>
+            </select>
+            {errors.paymentMethod && (
+              <p className="form-error">{errors.paymentMethod}</p>
+            )}
+          </div>
           <div className="form-info">
-            <p>Membership Fee: $100 for five years (payable upon approval).</p>
-            <p>
-              Physical ID Card Fee: $5 (optional, payable upon approval if
-              requested).
-            </p>
-            <p>
-              You will be contacted regarding payment options after your
-              application is approved.
-            </p>
+            <p>Membership Fee: $100 (for five years).</p>
+            {formData.wantId && <p>Physical ID Card Fee: $5.</p>}
+            <p>Total Due Upon Approval: ${formData.wantId ? 105 : 100}.</p>
+            <p>You will be contacted regarding payment after your application is approved. The information below is for your reference.</p>
+            {formData.paymentMethod === "cash" && (
+              <div>
+                <strong>Paying by Cash:</strong>
+                <p>Please bring exact change to the TANC office during office hours.</p>
+              </div>
+            )}
+            {formData.paymentMethod === "check" && (
+              <div>
+                <strong>Paying by Check:</strong>
+                <p>Make checks payable to: Tibetan Association of Northern California.</p>
+                <p>Mail to: [TANC Address - Placeholder, please update]</p>
+              </div>
+            )}
+            {formData.paymentMethod === "online" && (
+              <div>
+                <strong>Online Payment Details:</strong>
+                <p>Bank: US Bank</p>
+                <p>Account Name: Tibetan Association of Northern California</p>
+                <p>Account Number: 1575 0752 0797</p>
+                <p>Routing Number: 121122676</p>
+                <p>Please include your full name in the payment description/memo.</p>
+              </div>
+            )}
           </div>
         </>
       )}

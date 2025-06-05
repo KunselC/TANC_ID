@@ -9,11 +9,11 @@ import "../styles/Confirmation.css";
 
 function Confirmation() {
   const location = useLocation();
-  const {
-    type = "generic",
-    name = "Member",
-    wantId = false,
-  } = location.state || {};
+  const { type, name, wantId, paymentMethod } = location.state || {}; // Added paymentMethod
+
+  const membershipFee = 100;
+  const idFee = 5;
+  const totalAmount = wantId ? membershipFee + idFee : membershipFee;
 
   const renderContent = () => {
     switch (type) {
@@ -118,6 +118,141 @@ function Confirmation() {
     <div className="confirmation-container">
       <div className="confirmation-card">
         {renderContent()}
+
+        <div className="confirmation-details">
+          <p>
+            Thank you for submitting your{" "}
+            {type === "renewal" ? "renewal" : "new membership"} application,{" "}
+            {name}.
+          </p>
+          <p>
+            Your application is now pending review. You will be notified via
+            email once a decision has been made.
+          </p>
+          {type === "application" && (
+            <>
+              <p>Membership Fee: ${membershipFee}</p>
+              {wantId && <p>Physical ID Card Fee: ${idFee}</p>}
+              <p>
+                <strong>Total Amount Due Upon Approval: ${totalAmount}</strong>
+              </p>
+              {wantId && <p>You have requested a physical ID card.</p>}
+
+              {paymentMethod && (
+                <div className="payment-info-summary">
+                  <h4>Payment Information Summary:</h4>
+                  <p>
+                    <strong>Selected Payment Method:</strong>{" "}
+                    {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}
+                  </p>
+                  {paymentMethod === "cash" && (
+                    <p>
+                      Please prepare ${totalAmount} in cash to be paid in person
+                      at the TANC office upon approval.
+                    </p>
+                  )}
+                  {paymentMethod === "check" && (
+                    <>
+                      <p>
+                        Please prepare a check for ${totalAmount} payable to:{" "}
+                        <strong>Tibetan Association of Northern California</strong>.
+                      </p>
+                      <p>
+                        You can mail it or bring it to the TANC office upon
+                        approval. Mailing address: [TANC Address - Placeholder,
+                        please update]
+                      </p>
+                    </>
+                  )}
+                  {paymentMethod === "online" && (
+                    <>
+                      <p>
+                        Upon approval, please make an online payment of $
+                        {totalAmount} to:
+                      </p>
+                      <p>
+                        <strong>Bank:</strong> US Bank
+                      </p>
+                      <p>
+                        <strong>Account Name:</strong> Tibetan Association of
+                        Northern California
+                      </p>
+                      <p>
+                        <strong>Account Number:</strong> 1575 0752 0797
+                      </p>
+                      <p>
+                        <strong>Routing Number:</strong> 121122676
+                      </p>
+                      <p>
+                        Please include your full name in the payment
+                        description/memo.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {type === "renewal" && (
+            <>
+              <h2>Important Renewal Information:</h2>
+              <p>
+                Your renewal application is being processed. Please ensure the
+                renewal fee is paid to avoid any lapse in membership.
+              </p>
+              <div className="payment-info-summary">
+                <h4>Payment Information Summary:</h4>
+                <p>
+                  <strong>Selected Payment Method:</strong>{" "}
+                  {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}
+                </p>
+                {paymentMethod === "cash" && (
+                  <p>
+                    Please prepare $100 in cash to be paid in person at the TANC
+                    office upon approval.
+                  </p>
+                )}
+                {paymentMethod === "check" && (
+                  <>
+                    <p>
+                      Please prepare a check for $100 payable to:{" "}
+                      <strong>Tibetan Association of Northern California</strong>.
+                    </p>
+                    <p>
+                      You can mail it or bring it to the TANC office upon
+                      approval. Mailing address: [TANC Address - Placeholder,
+                      please update]
+                    </p>
+                  </>
+                )}
+                {paymentMethod === "online" && (
+                  <>
+                    <p>
+                      Upon approval, please make an online payment of $100 to:
+                    </p>
+                    <p>
+                      <strong>Bank:</strong> US Bank
+                    </p>
+                    <p>
+                      <strong>Account Name:</strong> Tibetan Association of
+                      Northern California
+                    </p>
+                    <p>
+                      <strong>Account Number:</strong> 1575 0752 0797
+                    </p>
+                    <p>
+                      <strong>Routing Number:</strong> 121122676
+                    </p>
+                    <p>
+                      Please include your full name in the payment
+                      description/memo.
+                    </p>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="confirmation-actions">
           <Link to="/" className="button primary-button">
