@@ -9,7 +9,6 @@ import {
   updateDoc,
   query,
   orderBy,
-  where,
   deleteDoc,
   setDoc,
   Timestamp,
@@ -18,6 +17,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import UserDetails from "../components/UserDetails";
 import ImageWithFallback from "../components/ImageWithFallback";
 import SystemStatus from "../components/SystemStatus";
+import NameChangeRequests from "./NameChangeRequests";
 import "../styles/AdminPanel.css";
 
 // Explanation: applications collection stores all submitted applications (new/renewal, pending/approved/rejected).
@@ -45,6 +45,17 @@ const calculateExpiryDateFromDate = (fromDate) => {
   }
 };
 
+// Helper to format date as DD/MM/YYYY
+const formatDateDMY = (date) => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "N/A";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 function AdminPanel() {
   const [applications, setApplications] = useState([]);
   const [users, setUsers] = useState([]);
@@ -59,6 +70,19 @@ function AdminPanel() {
   const [userSearchTerm, setUserSearchTerm] = useState("");
   const [userFilterStatus, setUserFilterStatus] = useState("all");
   const [userSortBy, setUserSortBy] = useState("name");
+
+  // State for Pending Applications Tab
+  const [pendingAppsSearchTerm, setPendingAppsSearchTerm] = useState("");
+  const [pendingAppsSortBy, setPendingAppsSortBy] = useState("submittedAt"); // Default sort for pending
+
+  // State for Rejected Applications Tab
+  const [rejectedAppsSearchTerm, setRejectedAppsSearchTerm] = useState("");
+  const [rejectedAppsSortBy, setRejectedAppsSortBy] = useState("rejectedAt"); // Default sort for rejected
+
+  // State for Name Change Requests Tab
+  const [nameChangeSearchTerm, setNameChangeSearchTerm] = useState("");
+  const [nameChangeSortBy, setNameChangeSortBy] = useState("requestedAt"); // Default sort for name changes
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -82,11 +106,11 @@ function AdminPanel() {
           return;
         }
 
-        // Fetch Pending Applications (New and Renewal)
+        // Fetch All Applications (pending and rejected)
         const appQuery = query(
           collection(db, "applications"),
-          where("status", "==", "pending"),
-          orderBy("submittedAt", "desc")
+          // where("status", "in", ["pending", "rejected"]), // Fetch both and filter client-side or adjust query
+          orderBy("submittedAt", "desc") // General sort, can be refined per tab
         );
         const appSnapshot = await getDocs(appQuery);
         const fetchedApplications = appSnapshot.docs.map((doc) => ({
@@ -267,6 +291,68 @@ function AdminPanel() {
     setConfirmingDelete(null);
   };
 
+  // Memoized and filtered pending applications
+  const filteredAndSortedPendingApplications = useMemo(() => {
+    return applications
+      .filter((app) => app.status === "pending")
+      .filter((app) => {
+        const searchTermLower = pendingAppsSearchTerm.toLowerCase();
+        if (!searchTermLower) return true; // No search term, show all pending
+        const nameMatch =
+          app.firstName?.toLowerCase().includes(searchTermLower) ||
+          app.lastName?.toLowerCase().includes(searchTermLower) ||
+          `${app.firstName} ${app.lastName}`
+            .toLowerCase()
+            .includes(searchTermLower);
+        const emailMatch = app.emailAddress
+          ?.toLowerCase()
+          .includes(searchTermLower);
+        return nameMatch || emailMatch;
+      })
+      .sort((a, b) => {
+        if (pendingAppsSortBy === "name") {
+          const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+          const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+          return nameA.localeCompare(nameB);
+        } else if (pendingAppsSortBy === "submittedAt") {
+          return (
+            (b.submittedAt?.toDate() || 0) - (a.submittedAt?.toDate() || 0)
+          ); // Newest first
+        }
+        return 0;
+      });
+  }, [applications, pendingAppsSearchTerm, pendingAppsSortBy]);
+
+  // Memoized and filtered rejected applications
+  const filteredAndSortedRejectedApplications = useMemo(() => {
+    return applications
+      .filter((app) => app.status === "rejected")
+      .filter((app) => {
+        const searchTermLower = rejectedAppsSearchTerm.toLowerCase();
+        if (!searchTermLower) return true; // No search term, show all rejected
+        const nameMatch =
+          app.firstName?.toLowerCase().includes(searchTermLower) ||
+          app.lastName?.toLowerCase().includes(searchTermLower) ||
+          `${app.firstName} ${app.lastName}`
+            .toLowerCase()
+            .includes(searchTermLower);
+        const emailMatch = app.emailAddress
+          ?.toLowerCase()
+          .includes(searchTermLower);
+        return nameMatch || emailMatch;
+      })
+      .sort((a, b) => {
+        if (rejectedAppsSortBy === "name") {
+          const nameA = `${a.firstName} ${a.lastName}`.toLowerCase();
+          const nameB = `${b.firstName} ${b.lastName}`.toLowerCase();
+          return nameA.localeCompare(nameB);
+        } else if (rejectedAppsSortBy === "rejectedAt") {
+          return (b.rejectedAt?.toDate() || 0) - (a.rejectedAt?.toDate() || 0); // Newest first
+        }
+        return 0;
+      });
+  }, [applications, rejectedAppsSearchTerm, rejectedAppsSortBy]);
+
   const filteredAndSortedUsers = useMemo(() => {
     const now = new Date();
     return users
@@ -301,7 +387,11 @@ function AdminPanel() {
         } else if (userSortBy === "expiry") {
           const dateA = a.expiresAt?.toDate() || 0;
           const dateB = b.expiresAt?.toDate() || 0;
-          return dateA - dateB;
+          return dateA - dateB; // Ascending (soonest to expire)
+        } else if (userSortBy === "createdAt_desc") {
+          return (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0); // Newest first
+        } else if (userSortBy === "createdAt_asc") {
+          return (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0); // Oldest first
         }
         return 0;
       });
@@ -373,13 +463,19 @@ function AdminPanel() {
               {selectedApplication.lastName}
             </h3>
             <p>
-              <strong>Date of Birth:</strong> {selectedApplication.dateOfBirth}
+              <strong>Date of Birth:</strong>{" "}
+              {selectedApplication.dateOfBirth
+                ? formatDateDMY(selectedApplication.dateOfBirth)
+                : "N/A"}
             </p>
             <p>
               <strong>Gender:</strong> {selectedApplication.gender}
             </p>
             <p>
-              <strong>Member Since:</strong> {selectedApplication.memberSince}
+              <strong>Member Since:</strong>{" "}
+              {selectedApplication.memberSince
+                ? formatDateDMY(selectedApplication.memberSince)
+                : "N/A"}
             </p>
             <p>
               <strong>Email Address:</strong> {selectedApplication.emailAddress}
@@ -393,8 +489,9 @@ function AdminPanel() {
             </p>
             <p>
               <strong>Submitted:</strong>{" "}
-              {selectedApplication.submittedAt?.toDate().toLocaleString() ||
-                "N/A"}
+              {selectedApplication.submittedAt
+                ? formatDateDMY(selectedApplication.submittedAt.toDate())
+                : "N/A"}
             </p>
           </div>
 
@@ -515,50 +612,126 @@ function AdminPanel() {
           className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
           onClick={() => setActiveTab("pending")}
         >
-          Pending Applications ({applications.length})
-        </button>
-        <button
-          className={`tab-button ${activeTab === "approved" ? "active" : ""}`}
-          onClick={() => setActiveTab("approved")}
-        >
-          Approved Applications (
-          {applications.filter((app) => app.status === "approved").length})
+          Pending Applications ({filteredAndSortedPendingApplications.length})
         </button>
         <button
           className={`tab-button ${activeTab === "rejected" ? "active" : ""}`}
           onClick={() => setActiveTab("rejected")}
         >
-          Rejected Applications (
-          {applications.filter((app) => app.status === "rejected").length})
+          Rejected Applications ({filteredAndSortedRejectedApplications.length})
         </button>
         <button
           className={`tab-button ${activeTab === "users" ? "active" : ""}`}
           onClick={() => setActiveTab("users")}
         >
-          Users ({users.length})
+          Users ({users.length}){" "}
+          {/* Consider using filteredAndSortedUsers.length here if filters are active */}
+        </button>
+        <button
+          className={`tab-button ${activeTab === "nameChange" ? "active" : ""}`}
+          onClick={() => setActiveTab("nameChange")}
+        >
+          Name Change Requests{" "}
+          {/* Length will be managed by NameChangeRequests component */}
         </button>
       </div>
 
-      {activeTab !== "users" ? (
+      {activeTab === "nameChange" ? (
+        <>
+          <div className="user-controls table-controls">
+            {" "}
+            {/* Added user-controls */}
+            <input
+              type="text"
+              placeholder="Search by user ID, old/new name..."
+              value={nameChangeSearchTerm}
+              onChange={(e) => setNameChangeSearchTerm(e.target.value)}
+              className="user-search-input search-input" /* Added user-search-input */
+            />
+            <select
+              value={nameChangeSortBy}
+              onChange={(e) => setNameChangeSortBy(e.target.value)}
+              className="user-sort-select sort-select" /* Added user-sort-select */
+            >
+              <option value="requestedAt_desc">
+                Sort by Date Requested (Newest)
+              </option>
+              <option value="requestedAt_asc">
+                Sort by Date Requested (Oldest)
+              </option>
+              <option value="oldName">Sort by Old Name (A-Z)</option>
+              <option value="newName">Sort by New Name (A-Z)</option>
+            </select>
+          </div>
+          <NameChangeRequests
+            searchTerm={nameChangeSearchTerm}
+            sortBy={nameChangeSortBy}
+          />
+        </>
+      ) : activeTab !== "users" ? (
         <div className="application-list">
           <h3>
             {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}{" "}
             Applications
           </h3>
 
-          {applications.filter((application) => {
-            switch (activeTab) {
-              case "pending":
-                return application.status === "pending";
-              case "approved":
-                return application.status === "approved";
-              case "rejected":
-                return application.status === "rejected";
-              default:
-                return true;
-            }
-          }).length === 0 ? (
-            <p className="no-data">No {activeTab} applications found.</p>
+          {/* Search and Sort for Pending Applications */}
+          {activeTab === "pending" && (
+            <div className="user-controls table-controls">
+              {" "}
+              {/* Added user-controls */}
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={pendingAppsSearchTerm}
+                onChange={(e) => setPendingAppsSearchTerm(e.target.value)}
+                className="user-search-input search-input" /* Added user-search-input */
+              />
+              <select
+                value={pendingAppsSortBy}
+                onChange={(e) => setPendingAppsSortBy(e.target.value)}
+                className="user-sort-select sort-select" /* Added user-sort-select */
+              >
+                <option value="submittedAt">
+                  Sort by Date Applied (Newest)
+                </option>
+                <option value="name">Sort by Name (A-Z)</option>
+              </select>
+            </div>
+          )}
+
+          {/* Search and Sort for Rejected Applications */}
+          {activeTab === "rejected" && (
+            <div className="user-controls table-controls">
+              {" "}
+              {/* Added user-controls */}
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={rejectedAppsSearchTerm}
+                onChange={(e) => setRejectedAppsSearchTerm(e.target.value)}
+                className="user-search-input search-input" /* Added user-search-input */
+              />
+              <select
+                value={rejectedAppsSortBy}
+                onChange={(e) => setRejectedAppsSortBy(e.target.value)}
+                className="user-sort-select sort-select" /* Added user-sort-select */
+              >
+                <option value="rejectedAt">
+                  Sort by Date Rejected (Newest)
+                </option>
+                <option value="name">Sort by Name (A-Z)</option>
+              </select>
+            </div>
+          )}
+
+          {(activeTab === "pending" &&
+            filteredAndSortedPendingApplications.length === 0) ||
+          (activeTab === "rejected" &&
+            filteredAndSortedRejectedApplications.length === 0) ? (
+            <p className="no-data">
+              No {activeTab} applications found matching your criteria.
+            </p>
           ) : (
             <table className="admin-table">
               <thead>
@@ -566,64 +739,74 @@ function AdminPanel() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Date of Birth</th>
-                  <th>Date Applied</th>
+                  <th>
+                    {activeTab === "pending" ? "Date Applied" : "Date Rejected"}
+                  </th>
+                  <th>Type</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {applications
-                  .filter((application) => {
-                    switch (activeTab) {
-                      case "pending":
-                        return application.status === "pending";
-                      case "approved":
-                        return application.status === "approved";
-                      case "rejected":
-                        return application.status === "rejected";
-                      default:
-                        return true;
-                    }
-                  })
-                  .map((application) => (
-                    <tr key={application.id}>
-                      <td>
-                        {application.firstName} {application.lastName}
-                      </td>
-                      <td>{application.emailAddress}</td>
-                      <td>{application.dateOfBirth}</td>
-                      <td>
-                        {application.submittedAt
-                          ? application.submittedAt
-                              .toDate()
-                              .toLocaleDateString()
-                          : "Unknown"}
-                      </td>
-                      <td>
+                {(activeTab === "pending"
+                  ? filteredAndSortedPendingApplications
+                  : filteredAndSortedRejectedApplications
+                ).map((application) => (
+                  <tr key={application.id}>
+                    <td>
+                      {application.firstName} {application.lastName}
+                    </td>
+                    <td>{application.emailAddress}</td>
+                    <td>
+                      {application.dateOfBirth
+                        ? formatDateDMY(application.dateOfBirth)
+                        : "N/A"}
+                    </td>
+                    <td>
+                      {activeTab === "pending"
+                        ? application.submittedAt
+                          ? formatDateDMY(application.submittedAt.toDate())
+                          : "Unknown"
+                        : application.rejectedAt
+                        ? formatDateDMY(application.rejectedAt.toDate())
+                        : "Unknown"}
+                    </td>
+                    <td>
+                      {application.type === "renewal" ? "Renewal" : "New"}
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => handleViewApplication(application)}
+                        className="view-button small" // Added small class for consistency
+                      >
+                        View
+                      </button>
+                      {activeTab === "pending" && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(application)}
+                            className="approve-button small"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReject(application)}
+                            className="reject-button small"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      {activeTab === "rejected" && (
                         <button
-                          onClick={() => handleViewApplication(application)}
-                          className="view-button"
+                          onClick={() => handleDeleteInitiate(application)} // Option to delete rejected app
+                          className="delete-button small"
                         >
-                          View
+                          Delete
                         </button>
-                        {activeTab === "pending" && (
-                          <>
-                            <button
-                              onClick={() => handleApprove(application)}
-                              className="approve-button small"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleReject(application)}
-                              className="reject-button small"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -632,18 +815,20 @@ function AdminPanel() {
         <div className="user-list">
           <h3>All Users ({filteredAndSortedUsers.length})</h3>
 
-          <div className="user-controls">
+          <div className="user-controls table-controls">
+            {" "}
+            {/* Added table-controls class */}
             <input
               type="text"
               placeholder="Search by name or email..."
               value={userSearchTerm}
               onChange={(e) => setUserSearchTerm(e.target.value)}
-              className="user-search-input"
+              className="user-search-input search-input" // Added search-input class
             />
             <select
               value={userFilterStatus}
               onChange={(e) => setUserFilterStatus(e.target.value)}
-              className="user-filter-select"
+              className="user-filter-select sort-select" // Changed to sort-select for consistency
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -652,10 +837,16 @@ function AdminPanel() {
             <select
               value={userSortBy}
               onChange={(e) => setUserSortBy(e.target.value)}
-              className="user-sort-select"
+              className="user-sort-select sort-select" // Added sort-select class
             >
-              <option value="name">Sort by Name</option>
+              <option value="name">Sort by Name (A-Z)</option>
               <option value="expiry">Sort by Expiry Date</option>
+              <option value="createdAt_desc">
+                Sort by Creation Date (Newest)
+              </option>
+              <option value="createdAt_asc">
+                Sort by Creation Date (Oldest)
+              </option>
             </select>
           </div>
 
@@ -694,13 +885,11 @@ function AdminPanel() {
                       <td>{user.emailAddress}</td>
                       <td>
                         {user.memberSince
-                          ? new Date(user.memberSince).toLocaleDateString()
+                          ? formatDateDMY(user.memberSince)
                           : "N/A"}
                       </td>
                       <td>
-                        {expiryDate
-                          ? expiryDate.toLocaleDateString()
-                          : "Unknown"}
+                        {expiryDate ? formatDateDMY(expiryDate) : "Unknown"}
                       </td>
                       <td>
                         <span

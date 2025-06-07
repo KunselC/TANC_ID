@@ -1,11 +1,11 @@
 import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { uploadToCloudinary } from "../cloudinary";
 import { auth, db } from "../firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
-import { useNavigate, Link } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner";
-import imageCompression from "browser-image-compression"; // Import compression library
+import imageCompression from "browser-image-compression";
 import "../styles/Form.css";
 
 function Application() {
@@ -18,23 +18,25 @@ function Application() {
     gender: "",
     memberSince: "",
     homeAddress: "",
-    greenBook: null,
-    headShot: null,
-    wantId: false,
+    greenBook: null, // File object for Green Book photo
+    headShot: null, // File object for headshot photo
+    wantId: false, // Boolean for physical ID card request
     email: "",
     password: "",
-    paymentMethod: "", // Added paymentMethod
+    paymentMethod: "", // Selected payment method
   });
 
   const [status, setStatus] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [statusType, setStatusType] = useState("");
-  const [step, setStep] = useState(1);
-  const totalSteps = 4; // Increased total steps
+  const [statusType, setStatusType] = useState(""); // 'success', 'error', or 'info'
+  const [step, setStep] = useState(1); // Current step in the multi-step form
+  const totalSteps = 4; // Total number of steps in the form
 
+  // Validates the entire form before submission
   const validateForm = () => {
     const newErrors = {};
+    // Validate personal information
     if (!formData.firstName) newErrors.firstName = "First name is required";
     if (!formData.lastName) newErrors.lastName = "Last name is required";
     if (!formData.dateOfBirth)
@@ -44,26 +46,42 @@ function Application() {
       newErrors.memberSince = "Member since date is required";
     if (!formData.homeAddress)
       newErrors.homeAddress = "Home address is required";
+
+    // Validate account setup information
     if (!formData.email) newErrors.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(formData.email))
       newErrors.email = "Email address is invalid";
     if (!formData.password) newErrors.password = "Password is required";
     else if (formData.password.length < 6)
       newErrors.password = "Password must be at least 6 characters";
+
+    // Validate document uploads
+    if (!formData.greenBook)
+      newErrors.greenBook = "Green Book photo is required"; // Added validation for Green Book
     if (!formData.headShot) newErrors.headShot = "Head shot photo is required";
-    if (step === 4 && !formData.paymentMethod) newErrors.paymentMethod = "Payment method is required"; // Added payment method validation
+
+    // Validate payment method if on the payment step
+    if (step === 4 && !formData.paymentMethod)
+      newErrors.paymentMethod = "Payment method is required";
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0; // Returns true if no errors
   };
 
+  // Handles the form submission process
   const handleSubmit = async () => {
+    // Re-validate before submission to catch all errors
     if (!validateForm()) {
+      // Changed to use validateForm
       setStatus(
         "Please correct the errors marked in the form before submitting."
       );
       setStatusType("error");
-      const firstErrorField = Object.keys(errors)[0];
+      // Determine which step to navigate to based on the first error
+      // Ensure errors object is up-to-date by calling validateForm() before accessing Object.keys(errors)
+      const currentErrors = errors; // Use the errors state updated by validateForm
+      const firstErrorField = Object.keys(currentErrors)[0];
+
       if (
         [
           "firstName",
@@ -77,7 +95,8 @@ function Application() {
         setStep(1);
       } else if (["email", "password"].includes(firstErrorField)) {
         setStep(2);
-      } else if (["headShot"].includes(firstErrorField)) {
+      } else if (["greenBook", "headShot"].includes(firstErrorField)) {
+        // Added greenBook to this condition
         setStep(3);
       } else if (["paymentMethod"].includes(firstErrorField)) {
         setStep(4);
@@ -90,22 +109,29 @@ function Application() {
     setStatusType("info");
 
     try {
+      // Upload Green Book photo if provided
       let greenBookUrl = "";
       if (formData.greenBook) {
         setStatus("Uploading Green Book photo...");
         const greenBookRes = await uploadToCloudinary(formData.greenBook);
         greenBookUrl = greenBookRes.secure_url;
+      } else {
+        // This case should ideally be caught by validateForm, but good for robustness
+        throw new Error("Green Book photo is missing.");
       }
 
+      // Upload headshot photo (required)
       let headShotUrl = "";
       if (formData.headShot) {
         setStatus("Uploading headshot photo...");
         const headShotRes = await uploadToCloudinary(formData.headShot);
         headShotUrl = headShotRes.secure_url;
       } else {
+        // This case should ideally be caught by validateForm, but good for robustness
         throw new Error("Headshot photo is missing.");
       }
 
+      // Create user account with Firebase Authentication
       setStatus("Creating user account...");
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -114,6 +140,7 @@ function Application() {
       );
       const user = userCredential.user;
 
+      // Prepare application data for Firestore
       setStatus("Saving application data...");
       const applicationData = {
         userId: user.uid,
@@ -123,43 +150,46 @@ function Application() {
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
         memberSince: formData.memberSince,
-        emailAddress: formData.email,
+        emailAddress: formData.email, // Storing email for record-keeping
         homeAddress: formData.homeAddress,
         greenBookUrl: greenBookUrl,
         headShotUrl: headShotUrl,
         wantId: formData.wantId,
-        paymentMethod: formData.paymentMethod, // Added paymentMethod
-        status: "pending",
-        submittedAt: Timestamp.now(),
-        type: "new",
+        paymentMethod: formData.paymentMethod,
+        status: "pending", // Initial status of the application
+        submittedAt: Timestamp.now(), // Timestamp of submission
+        type: "new", // Type of application
       };
 
+      // Add application data to Firestore
       await addDoc(collection(db, "applications"), applicationData);
 
+      // Navigate to confirmation page with relevant state
       navigate("/confirmation", {
         state: {
           type: "application",
           name: formData.firstName,
           wantId: formData.wantId,
-          paymentMethod: formData.paymentMethod, // Pass paymentMethod to confirmation
+          paymentMethod: formData.paymentMethod,
         },
       });
     } catch (err) {
       console.error("Application submission error:", err);
       let userMessage = "Error submitting application: ";
+      // Handle specific error types
       if (err.code === "auth/email-already-in-use") {
         userMessage +=
           "This email address is already associated with an account. Please log in or use a different email.";
-        setStep(2);
+        setStep(2); // Navigate to account setup step
         setErrors((prev) => ({ ...prev, email: "Email already in use" }));
       } else if (err.message.includes("Cloudinary")) {
         userMessage +=
           "There was an issue uploading your photo(s). Please check the file format and size, then try again.";
-        setStep(3);
+        setStep(3); // Navigate to documents step
       } else if (err.message.includes("Database connection failed")) {
-        userMessage = err.message;
+        userMessage = err.message; // More specific error for database issues
       } else {
-        userMessage += err.message;
+        userMessage += err.message; // Generic error message
       }
       setStatus(userMessage);
       setStatusType("error");
@@ -167,9 +197,11 @@ function Application() {
     }
   };
 
+  // Validates the current step of the form
   const validateStep = (currentStep) => {
     const newErrors = {};
     if (currentStep === 1) {
+      // Validate personal information fields
       if (!formData.firstName) newErrors.firstName = "First name is required";
       if (!formData.lastName) newErrors.lastName = "Last name is required";
       if (!formData.dateOfBirth)
@@ -180,6 +212,7 @@ function Application() {
       if (!formData.homeAddress)
         newErrors.homeAddress = "Home address is required";
     } else if (currentStep === 2) {
+      // Validate account setup fields
       if (!formData.email) newErrors.email = "Email is required";
       else if (!/\S+@\S+\.\S+/.test(formData.email))
         newErrors.email = "Email address is invalid";
@@ -187,20 +220,26 @@ function Application() {
       else if (formData.password.length < 6)
         newErrors.password = "Password must be at least 6 characters";
     } else if (currentStep === 3) {
+      // Validate document upload fields
+      if (!formData.greenBook)
+        newErrors.greenBook = "Green Book photo is required"; // Added validation for Green Book
       if (!formData.headShot)
         newErrors.headShot = "Head shot photo is required";
-    } else if (currentStep === 4) { // Added validation for payment step
-      if (!formData.paymentMethod) newErrors.paymentMethod = "Payment method is required";
+    } else if (currentStep === 4) {
+      // Validate payment method selection
+      if (!formData.paymentMethod)
+        newErrors.paymentMethod = "Payment method is required";
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0; // Returns true if no errors for the current step
   };
 
+  // Moves to the next step if the current step is valid
   const goToNextStep = () => {
     if (validateStep(step)) {
       setStep(step + 1);
-      setStatus("");
+      setStatus(""); // Clear any previous status messages
       setStatusType("");
     } else {
       setStatus("Please complete the required fields for this step.");
@@ -208,11 +247,13 @@ function Application() {
     }
   };
 
+  // Handles file input changes, including validation and compression
   const handleFileChange = async (e) => {
-    // Make async
     const { name, files } = e.target;
     if (files.length > 0) {
       let file = files[0];
+
+      // Validate file type (PNG or JPG)
       if (!["image/png", "image/jpeg"].includes(file.type)) {
         setErrors((prev) => ({
           ...prev,
@@ -221,8 +262,9 @@ function Application() {
         setFormData((prev) => ({ ...prev, [name]: null })); // Clear invalid file
         return;
       }
+
+      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
         setErrors((prev) => ({
           ...prev,
           [name]: "File size exceeds 5MB limit.",
@@ -231,19 +273,19 @@ function Application() {
         return;
       }
 
-      // Compress image before setting state
+      // Image compression options
       const options = {
-        maxSizeMB: 1, // Max size in MB
-        maxWidthOrHeight: 1024, // Max width or height
-        useWebWorker: true,
+        maxSizeMB: 1, // Max size in MB after compression
+        maxWidthOrHeight: 1024, // Max width or height after compression
+        useWebWorker: true, // Use web worker for performance
       };
 
       try {
-        setStatus(`Compressing ${name}...`);
+        setStatus(`Compressing ${name}...`); // Show compression status
         setStatusType("info");
         const compressedFile = await imageCompression(file, options);
         setFormData((prev) => ({ ...prev, [name]: compressedFile }));
-        setErrors((prev) => ({ ...prev, [name]: "" })); // Clear error on success
+        setErrors((prev) => ({ ...prev, [name]: "" })); // Clear any previous error for this field
         setStatus(""); // Clear compression status
       } catch (error) {
         console.error("Image compression error:", error);
@@ -251,10 +293,11 @@ function Application() {
           ...prev,
           [name]: "Error compressing image. Please try again.",
         }));
-        setFormData((prev) => ({ ...prev, [name]: null })); // Clear on error
+        setFormData((prev) => ({ ...prev, [name]: null })); // Clear file on compression error
         setStatus(""); // Clear compression status
       }
     } else {
+      // If no file is selected, clear the field
       setFormData((prev) => ({ ...prev, [name]: null }));
     }
   };
@@ -263,6 +306,7 @@ function Application() {
     <div className="form-container">
       <h2 className="form-title">Membership Application</h2>
 
+      {/* Progress bar for multi-step form */}
       <div className="form-progress">
         {[...Array(totalSteps)].map((_, i) => (
           <div
@@ -270,7 +314,7 @@ function Application() {
             className={`progress-step ${step > i ? "completed" : ""} ${
               step === i + 1 ? "active" : ""
             }`}
-            onClick={() => i + 1 < step && setStep(i + 1)}
+            onClick={() => i + 1 < step && setStep(i + 1)} // Allow navigation to previous completed steps
             style={{ cursor: i + 1 < step ? "pointer" : "default" }}
           >
             <div className="step-number">{i + 1}</div>
@@ -281,12 +325,13 @@ function Application() {
                 ? "Account Setup"
                 : i === 2
                 ? "Documents"
-                : "Payment"} 
+                : "Payment"}
             </div>
           </div>
         ))}
       </div>
 
+      {/* Status message display area */}
       {status && (
         <div
           className={`form-status ${
@@ -304,6 +349,7 @@ function Application() {
         </div>
       )}
 
+      {/* Step 1: Personal Information */}
       {step === 1 && (
         <>
           <div className="form-row">
@@ -316,7 +362,7 @@ function Application() {
                   onChange={(e) => {
                     setFormData({ ...formData, firstName: e.target.value });
                     if (errors.firstName)
-                      setErrors({ ...errors, firstName: undefined });
+                      setErrors({ ...errors, firstName: undefined }); // Clear error on change
                   }}
                 />
                 {errors.firstName && (
@@ -333,7 +379,7 @@ function Application() {
                   onChange={(e) => {
                     setFormData({ ...formData, lastName: e.target.value });
                     if (errors.lastName)
-                      setErrors({ ...errors, lastName: undefined });
+                      setErrors({ ...errors, lastName: undefined }); // Clear error on change
                   }}
                 />
                 {errors.lastName && (
@@ -365,7 +411,7 @@ function Application() {
                   onChange={(e) => {
                     setFormData({ ...formData, dateOfBirth: e.target.value });
                     if (errors.dateOfBirth)
-                      setErrors({ ...errors, dateOfBirth: undefined });
+                      setErrors({ ...errors, dateOfBirth: undefined }); // Clear error on change
                   }}
                 />
                 {errors.dateOfBirth && (
@@ -382,7 +428,7 @@ function Application() {
                   onChange={(e) => {
                     setFormData({ ...formData, gender: e.target.value });
                     if (errors.gender)
-                      setErrors({ ...errors, gender: undefined });
+                      setErrors({ ...errors, gender: undefined }); // Clear error on change
                   }}
                 >
                   <option value="">Select...</option>
@@ -405,7 +451,7 @@ function Application() {
               onChange={(e) => {
                 setFormData({ ...formData, memberSince: e.target.value });
                 if (errors.memberSince)
-                  setErrors({ ...errors, memberSince: undefined });
+                  setErrors({ ...errors, memberSince: undefined }); // Clear error on change
               }}
             />
             <p className="form-hint">Date you first became a TANC member.</p>
@@ -422,7 +468,7 @@ function Application() {
               onChange={(e) => {
                 setFormData({ ...formData, homeAddress: e.target.value });
                 if (errors.homeAddress)
-                  setErrors({ ...errors, homeAddress: undefined });
+                  setErrors({ ...errors, homeAddress: undefined }); // Clear error on change
               }}
             />
             {errors.homeAddress && (
@@ -432,6 +478,7 @@ function Application() {
         </>
       )}
 
+      {/* Step 2: Account Setup */}
       {step === 2 && (
         <>
           <div className="form-group">
@@ -442,7 +489,7 @@ function Application() {
               value={formData.email}
               onChange={(e) => {
                 setFormData({ ...formData, email: e.target.value });
-                if (errors.email) setErrors({ ...errors, email: undefined });
+                if (errors.email) setErrors({ ...errors, email: undefined }); // Clear error on change
               }}
             />
             <p className="form-hint">This will be your login email.</p>
@@ -458,7 +505,7 @@ function Application() {
               onChange={(e) => {
                 setFormData({ ...formData, password: e.target.value });
                 if (errors.password)
-                  setErrors({ ...errors, password: undefined });
+                  setErrors({ ...errors, password: undefined }); // Clear error on change
               }}
             />
             <p className="form-hint">Must be at least 6 characters.</p>
@@ -467,19 +514,21 @@ function Application() {
         </>
       )}
 
+      {/* Step 3: Document Uploads */}
       {step === 3 && (
         <>
           <div className="form-group">
-            <label className="form-label">Green Book Photo (Optional)</label>
+            <label className="form-label required">Green Book Photo</label>{" "}
+            {/* Changed label */}
             <input
               name="greenBook"
-              className="form-file-input"
+              className={`form-file-input ${errors.greenBook ? "error" : ""}`} // Added error class
               type="file"
-              accept="image/png, image/jpeg"
+              accept="image/png, image/jpeg" // Accept only PNG and JPG
               onChange={handleFileChange}
             />
             <p className="form-hint">
-              Optional. Upload a clear photo of your Green Book page. PNG or JPG
+              Required. Upload a clear photo of your Green Book page. PNG or JPG
               only.
             </p>
             {errors.greenBook && (
@@ -498,7 +547,7 @@ function Application() {
               name="headShot"
               className={`form-file-input ${errors.headShot ? "error" : ""}`}
               type="file"
-              accept="image/png, image/jpeg"
+              accept="image/png, image/jpeg" // Accept only PNG and JPG
               onChange={handleFileChange}
             />
             <p className="form-hint">
@@ -532,7 +581,8 @@ function Application() {
         </>
       )}
 
-      {step === 4 && ( // Added payment step UI
+      {/* Step 4: Payment Information */}
+      {step === 4 && (
         <>
           <div className="form-group">
             <label className="form-label required">Payment Method</label>
@@ -542,7 +592,7 @@ function Application() {
               onChange={(e) => {
                 setFormData({ ...formData, paymentMethod: e.target.value });
                 if (errors.paymentMethod)
-                  setErrors({ ...errors, paymentMethod: undefined });
+                  setErrors({ ...errors, paymentMethod: undefined }); // Clear error on change
               }}
             >
               <option value="">Select Payment Method...</option>
@@ -558,18 +608,28 @@ function Application() {
             <p>Membership Fee: $100 (for five years).</p>
             {formData.wantId && <p>Physical ID Card Fee: $5.</p>}
             <p>Total Due Upon Approval: ${formData.wantId ? 105 : 100}.</p>
-            <p>You will be contacted regarding payment after your application is approved. The information below is for your reference.</p>
+            <p>
+              You will be contacted regarding payment after your application is
+              approved. The information below is for your reference.
+            </p>
+            {/* Display payment details based on selected method */}
             {formData.paymentMethod === "cash" && (
               <div>
                 <strong>Paying by Cash:</strong>
-                <p>Please bring exact change to the TANC office during office hours.</p>
+                <p>
+                  Please bring exact change to the TANC office during office
+                  hours: 5200 Dalai Lama Ave, Richmond, CA 94804.
+                </p>
               </div>
             )}
             {formData.paymentMethod === "check" && (
               <div>
                 <strong>Paying by Check:</strong>
-                <p>Make checks payable to: Tibetan Association of Northern California.</p>
-                <p>Mail to: [TANC Address - Placeholder, please update]</p>
+                <p>
+                  Make checks payable to: Tibetan Association of Northern
+                  California.
+                </p>
+                <p>Mail to: 5200 Dalai Lama Ave, Richmond, CA 94804</p>
               </div>
             )}
             {formData.paymentMethod === "online" && (
@@ -579,20 +639,23 @@ function Application() {
                 <p>Account Name: Tibetan Association of Northern California</p>
                 <p>Account Number: 1575 0752 0797</p>
                 <p>Routing Number: 121122676</p>
-                <p>Please include your full name in the payment description/memo.</p>
+                <p>
+                  Please include your full name in the payment description/memo.
+                </p>
               </div>
             )}
           </div>
         </>
       )}
 
+      {/* Navigation buttons for form steps */}
       <div className="form-navigation">
         {step > 1 && (
           <button
             type="button"
-            onClick={() => setStep(step - 1)}
+            onClick={() => setStep(step - 1)} // Go to previous step
             className="form-button form-prev"
-            disabled={isLoading}
+            disabled={isLoading} // Disable if loading
           >
             Previous
           </button>
@@ -601,23 +664,25 @@ function Application() {
         {step < totalSteps ? (
           <button
             type="button"
-            onClick={goToNextStep}
+            onClick={goToNextStep} // Go to next step
             className="form-button form-next"
-            disabled={isLoading}
+            disabled={isLoading} // Disable if loading
           >
             Next
           </button>
         ) : (
+          // Submit button on the last step
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isLoading}
+            disabled={isLoading} // Disable if loading
             className="form-submit"
           >
             {isLoading ? "Submitting..." : "Submit Application"}
           </button>
         )}
       </div>
+      {/* Link to login page for existing users */}
       <div className="form-footer-link">
         Already applied or have an account? <Link to="/login">Login Here</Link>
       </div>

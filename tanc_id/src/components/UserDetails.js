@@ -1,6 +1,19 @@
 import React from "react";
 import "../styles/UserDetails.css";
 
+const formatDateDMY = (date) => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "N/A";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+const capitalize = (str) =>
+  str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "N/A";
+
 function UserDetails({ user, onClose }) {
   if (!user) return null;
 
@@ -23,15 +36,19 @@ function UserDetails({ user, onClose }) {
           </tr>
           <tr>
             <td>Date of Birth:</td>
-            <td>{user.dateOfBirth}</td>
+            <td>
+              {user.dateOfBirth ? formatDateDMY(user.dateOfBirth) : "N/A"}
+            </td>
           </tr>
           <tr>
             <td>Gender:</td>
-            <td>{user.gender}</td>
+            <td>{capitalize(user.gender)}</td>
           </tr>
           <tr>
             <td>Member Since:</td>
-            <td>{user.memberSince}</td>
+            <td>
+              {user.memberSince ? formatDateDMY(user.memberSince) : "N/A"}
+            </td>
           </tr>
           <tr>
             <td>Email Address:</td>
@@ -52,6 +69,25 @@ function UserDetails({ user, onClose }) {
       {user.photoUrl && (
         <div className="user-photo">
           <img src={user.photoUrl} alt="User" width="200" />
+        </div>
+      )}
+      {/* Show old name/address/email/photo history if available */}
+      {user.nameChangeHistory && user.nameChangeHistory.length > 0 && (
+        <div className="user-history">
+          <h4>Previous Names</h4>
+          <ul>
+            {user.nameChangeHistory.map((entry, idx) => (
+              <li key={idx}>
+                {entry.firstName} {entry.lastName} (changed at{" "}
+                {formatDateDMY(
+                  entry.changedAt?.toDate
+                    ? entry.changedAt.toDate()
+                    : entry.changedAt
+                )}
+                )
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {onClose && (

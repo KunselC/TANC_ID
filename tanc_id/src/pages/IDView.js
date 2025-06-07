@@ -25,6 +25,19 @@ const getExpiryDateString = (expiresAtTimestamp) => {
   }
 };
 
+// Helper to format date as DD/MM/YYYY
+const formatDateDMY = (date) => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "N/A";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+const capitalize = (str) =>
+  str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "N/A";
+
 function IDView() {
   const [userData, setUserData] = useState(null);
   const [status, setStatus] = useState("Loading...");
@@ -77,17 +90,17 @@ function IDView() {
           if (!cancelled) {
             if (!appSnapshot.empty) {
               const appData = appSnapshot.docs[0].data();
-              if (appData.rejected) {
+              if (appData.status === "rejected") {
                 setStatus(
                   "Your application was rejected. Please contact support for details."
                 );
               } else if (appData.status === "pending") {
                 setStatus(
-                  "Your application is still pending approval. Please check back later."
+                  "Your application is still pending approval. You will be able to view your ID here once it is approved. Please check back later."
                 );
               } else {
                 setStatus(
-                  "Your ID record is not available yet. Please contact support."
+                  "Your application has been approved, but your ID is still being processed. Please check back shortly or contact support if this persists."
                 );
               }
             } else {
@@ -181,7 +194,15 @@ function IDView() {
       <div className="id-container">
         <div className="status-container expired-notice">
           <h2>Membership Expired</h2>
-          <p className="status-message">{status}</p>
+          <p className="status-message">
+            Your membership has expired and you can no longer view your ID.
+          </p>
+          <p className="status-message">
+            To regain access, please renew your membership.
+          </p>
+          <Link to="/renewal-application" className="renew-button">
+            Renew Membership
+          </Link>
         </div>
       </div>
     );
@@ -248,19 +269,23 @@ function IDView() {
 
             <div className="id-info">
               <span className="id-label">Date of Birth</span>
-              <span className="id-value">{userData.dateOfBirth || "N/A"}</span>
+              <span className="id-value">
+                {userData.dateOfBirth
+                  ? formatDateDMY(userData.dateOfBirth)
+                  : "N/A"}
+              </span>
             </div>
 
             <div className="id-info">
               <span className="id-label">Gender</span>
-              <span className="id-value">{userData.gender || "N/A"}</span>
+              <span className="id-value">{capitalize(userData.gender)}</span>
             </div>
 
             <div className="id-info">
               <span className="id-label">Member Since</span>
               <span className="id-value">
                 {userData.memberSince
-                  ? new Date(userData.memberSince).toLocaleDateString()
+                  ? formatDateDMY(userData.memberSince)
                   : "N/A"}
               </span>
             </div>

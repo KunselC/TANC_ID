@@ -198,6 +198,18 @@ function RenewalApplication() {
     }
   };
 
+  const formatDateDMY = (date) => {
+    if (!date) return "N/A";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "N/A";
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+  const capitalize = (str) =>
+    str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "N/A";
+
   if (isLoading) {
     return <LoadingSpinner message="Loading your information..." />;
   }
@@ -254,13 +266,13 @@ function RenewalApplication() {
                 <p>
                   Member Since:{" "}
                   {currentUserData.memberSince
-                    ? new Date(currentUserData.memberSince).toLocaleDateString()
+                    ? formatDateDMY(currentUserData.memberSince)
                     : "N/A"}
                 </p>
                 <p>
                   Expires:{" "}
                   {currentUserData.expiresAt
-                    ? currentUserData.expiresAt.toDate().toLocaleDateString()
+                    ? formatDateDMY(currentUserData.expiresAt.toDate())
                     : "N/A"}
                 </p>
               </div>
@@ -271,10 +283,13 @@ function RenewalApplication() {
                 <strong>Email:</strong> {currentUserData.emailAddress}
               </p>
               <p>
-                <strong>DOB:</strong> {currentUserData.dateOfBirth}
+                <strong>DOB:</strong>{" "}
+                {currentUserData.dateOfBirth
+                  ? formatDateDMY(currentUserData.dateOfBirth)
+                  : "N/A"}
               </p>
               <p>
-                <strong>Gender:</strong> {currentUserData.gender}
+                <strong>Gender:</strong> {capitalize(currentUserData.gender)}
               </p>
               <p>
                 <strong>Address:</strong> {currentUserData.homeAddress}

@@ -1,8 +1,11 @@
 .footer {
-  background: var(--primary-color);
-  color: white;
+  background-color: #f8f9fa; /* Light grey background */
   padding: 20px 0;
-  margin-top: 40px;
+  text-align: center;
+  border-top: 1px solid #e7e7e7; /* Subtle top border */
+  font-family: "Arial", sans-serif; /* Consistent font */
+  color: #333; /* Darker text color for readability */
+  margin-top: auto; /* Push footer to the bottom */
 }
 
 .footer-content {
@@ -15,19 +18,24 @@
   flex-wrap: wrap;
 }
 
-.footer p {
-  margin: 0;
-  text-align: center;
+.footer-content p {
+  margin: 5px 0;
+  font-size: 0.9em;
+}
+
+.footer-content a {
+  color: #007bff; /* Standard link color */
+  text-decoration: none;
+}
+
+.footer-content a:hover {
+  text-decoration: underline;
 }
 
 .tibetan-pattern {
-  height: 8px;
-  width: 100%;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--primary-color),
-    var(--primary-color) 10px,
-    var(--accent-color) 10px,
-    var(--accent-color) 20px
-  );
+  height: 10px; /* Adjust as needed */
+  /* background-image: url('../assets/tibetan-pattern.png'); Ensure you have this image or remove/comment out if not used */
+  background-repeat: repeat-x;
+  background-size: contain;
+  margin-bottom: 10px;
 }

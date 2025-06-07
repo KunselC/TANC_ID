@@ -166,6 +166,16 @@ function App() {
                 © {new Date().getFullYear()} Tibetan Association of Northern
                 California
               </p>
+              <p>
+                Developed by Kunsel Chodak -{" "}
+                <a
+                  href="https://github.com/KunselC"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
+              </p>
             </div>
           </footer>
         </Router>

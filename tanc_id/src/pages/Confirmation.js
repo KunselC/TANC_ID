@@ -1,15 +1,11 @@
 import React from "react";
 import { useLocation, Link } from "react-router-dom";
-import {
-  ApplicationIcon,
-  IdCardIcon,
-  SecurityIcon, // Use SecurityIcon instead of CheckCircleIcon
-} from "../components/Icons";
+import { ApplicationIcon, IdCardIcon, SecurityIcon } from "../components/Icons";
 import "../styles/Confirmation.css";
 
 function Confirmation() {
   const location = useLocation();
-  const { type, name, wantId, paymentMethod } = location.state || {}; // Added paymentMethod
+  const { type, name, wantId, paymentMethod } = location.state || {};
 
   const membershipFee = 100;
   const idFee = 5;
@@ -45,6 +41,69 @@ function Confirmation() {
                 )}
               </ol>
             </div>
+            {/* Payment information summary for new applications */}
+            {paymentMethod && (
+              <div className="payment-info-summary">
+                <h4>Payment Information Summary:</h4>
+                <p>
+                  <strong>
+                    Total Amount Due Upon Approval: ${totalAmount}
+                  </strong>
+                </p>
+                <p>
+                  <strong>Selected Payment Method:</strong>{" "}
+                  {paymentMethod.charAt(0).toUpperCase() +
+                    paymentMethod.slice(1)}
+                </p>
+                {paymentMethod === "cash" && (
+                  <p>
+                    Please prepare ${totalAmount} in cash to be paid in person
+                    at the TANC office upon approval: 5200 Dalai Lama Ave,
+                    Richmond, CA 94804.
+                  </p>
+                )}
+                {paymentMethod === "check" && (
+                  <>
+                    <p>
+                      Please prepare a check for ${totalAmount} payable to:{" "}
+                      <strong>
+                        Tibetan Association of Northern California
+                      </strong>
+                      .
+                    </p>
+                    <p>
+                      Mail to or bring to the TANC office upon approval: 5200
+                      Dalai Lama Ave, Richmond, CA 94804
+                    </p>
+                  </>
+                )}
+                {paymentMethod === "online" && (
+                  <>
+                    <p>
+                      Upon approval, please make an online payment of $
+                      {totalAmount} to:
+                    </p>
+                    <p>
+                      <strong>Bank:</strong> US Bank
+                    </p>
+                    <p>
+                      <strong>Account Name:</strong> Tibetan Association of
+                      Northern California
+                    </p>
+                    <p>
+                      <strong>Account Number:</strong> 1575 0752 0797
+                    </p>
+                    <p>
+                      <strong>Routing Number:</strong> 121122676
+                    </p>
+                    <p>
+                      Please include your full name in the payment
+                      description/memo.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
             <p>
               Please check your email for updates about your application status.
             </p>
@@ -74,7 +133,7 @@ function Confirmation() {
         return (
           <>
             <div className="confirmation-icon">
-              <SecurityIcon /> {/* Use SecurityIcon */}
+              <SecurityIcon />
             </div>
             <h1>Renewal Submitted, {name}!</h1>
             <p className="confirmation-message">
@@ -87,7 +146,9 @@ function Confirmation() {
                 <li>You'll receive an email upon approval.</li>
                 <li>
                   <strong>Important:</strong> Remember to pay the $100 renewal
-                  fee for 5 years. Contact the TANC office for payment options.
+                  fee for 5 years. Contact the TANC office for payment options
+                  (Cash/Check at 5200 Dalai Lama Ave, Richmond, CA 94804 or
+                  Online as per details provided during application).
                 </li>
                 <li>
                   Your membership expiry date will be updated upon approval and
@@ -143,24 +204,28 @@ function Confirmation() {
                   <h4>Payment Information Summary:</h4>
                   <p>
                     <strong>Selected Payment Method:</strong>{" "}
-                    {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}
+                    {paymentMethod.charAt(0).toUpperCase() +
+                      paymentMethod.slice(1)}
                   </p>
                   {paymentMethod === "cash" && (
                     <p>
                       Please prepare ${totalAmount} in cash to be paid in person
-                      at the TANC office upon approval.
+                      at the TANC office upon approval: 5200 Dalai Lama Ave,
+                      Richmond, CA 94804.
                     </p>
                   )}
                   {paymentMethod === "check" && (
                     <>
                       <p>
                         Please prepare a check for ${totalAmount} payable to:{" "}
-                        <strong>Tibetan Association of Northern California</strong>.
+                        <strong>
+                          Tibetan Association of Northern California
+                        </strong>
+                        .
                       </p>
                       <p>
                         You can mail it or bring it to the TANC office upon
-                        approval. Mailing address: [TANC Address - Placeholder,
-                        please update]
+                        approval: 5200 Dalai Lama Ave, Richmond, CA 94804
                       </p>
                     </>
                   )}
@@ -204,24 +269,28 @@ function Confirmation() {
                 <h4>Payment Information Summary:</h4>
                 <p>
                   <strong>Selected Payment Method:</strong>{" "}
-                  {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}
+                  {paymentMethod.charAt(0).toUpperCase() +
+                    paymentMethod.slice(1)}
                 </p>
                 {paymentMethod === "cash" && (
                   <p>
                     Please prepare $100 in cash to be paid in person at the TANC
-                    office upon approval.
+                    office upon approval: 5200 Dalai Lama Ave, Richmond, CA
+                    94804.
                   </p>
                 )}
                 {paymentMethod === "check" && (
                   <>
                     <p>
                       Please prepare a check for $100 payable to:{" "}
-                      <strong>Tibetan Association of Northern California</strong>.
+                      <strong>
+                        Tibetan Association of Northern California
+                      </strong>
+                      .
                     </p>
                     <p>
                       You can mail it or bring it to the TANC office upon
-                      approval. Mailing address: [TANC Address - Placeholder,
-                      please update]
+                      approval: 5200 Dalai Lama Ave, Richmond, CA 94804
                     </p>
                   </>
                 )}
